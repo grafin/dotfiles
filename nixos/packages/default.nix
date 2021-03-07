@@ -13,4 +13,6 @@
     vim
     wget
   ];
+
+  programs.gnupg.agent.enable = true
 }
