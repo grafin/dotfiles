@@ -7,6 +7,7 @@
     haskellPackages.update-nix-fetchgit
     killall
     nix-prefetch-git
+    pinentry
     tmux
     tree
     vim
