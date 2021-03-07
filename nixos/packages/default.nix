@@ -7,6 +7,7 @@
     killall
     nix-prefetch-git
     tmux
+    tree
     vim
     wget
   ];
