@@ -98,12 +98,30 @@
   #   pinentryFlavor = "gnome3";
   # };
 
+  # udev rules
+  services.udev.extraRules = ''
+    KERNEL=="vhost-net", MODE="0660", GROUP="vhost"
+    SUBSYSTEM=="usb", MODE="0664", GROUP="usb"
+    SUBSYSTEM=="macvtap", MODE="0660", GROUP="vhost"
+  '';
+
+  # Groups
+  users.groups = {
+    vhost = { };
+    usb = { };
+  };
+
   # Users
   users.users.boris = {
     isNormalUser = true;
     home = "/home/boris";
     description = "Stepanenko Boris";
-    extraGroups = [ "wheel" ];
+    extraGroups = [
+      "wheel"
+      "kvm"
+      "vhost"
+      "usb"
+    ];
   };
 
   # Packages
