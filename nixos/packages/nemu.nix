@@ -126,7 +126,6 @@ stdenv.mkDerivation rec {
     homepage = "https://github.com/nemuTUI/nemu";
     description = "Ncurses UI for QEMU";
     license = lib.licenses.bsd2;
-    maintainers = [ lib.maintainers.matthiasbeyer ];
     platforms = with lib.platforms; linux;
   };
 }
