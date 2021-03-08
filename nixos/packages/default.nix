@@ -16,8 +16,6 @@ in {
     killall
     nemu
     nix-prefetch-git
-    pinentry
-    pinentry-curses
     pinentry-gnome
     tmux
     tree
