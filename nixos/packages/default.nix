@@ -16,21 +16,11 @@ in {
     killall
     nemu
     nix-prefetch-git
-    pinentry-gnome
     tmux
     tree
     vim
     wget
   ];
-
-  programs = {
-    gnupg = {
-      agent = {
-        enable = true;
-        pinentryFlavor = "gnome3";
-      };
-    };
-  };
 
   security.wrappers.nemu = {
     source = "${nemu}/bin/nemu";
