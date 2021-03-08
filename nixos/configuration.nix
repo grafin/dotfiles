@@ -48,6 +48,18 @@
   services = {
     openssh.enable = true;
     printing.enable = true;
+    xserver = {
+      videoDrivers = [ "intel" ];
+      deviceSection = ''
+        Option "DRI" "2"
+        Option "TearFree" "true"
+      '';
+      useGlamor = true;
+      xkbModel = "microsoft";
+      layout = "us,ru(winkeys)";
+      xkbOptions = "grp:caps_toggle,grp_led:caps";
+      xkbVariant = "winkeys";
+    };
   };
 
   # Internationalisation properties.
