@@ -30,6 +30,9 @@ bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOU
 exec --no-startup-id i3-msg 'workspace 1:tty; exec kitty --start-as=fullscreen'
 exec --no-startup-id i3-msg 'workspace 3:web; exec firefox'
 
+# Autostart tray apps
+exec volctl
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
