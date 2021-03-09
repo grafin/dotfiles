@@ -15,6 +15,7 @@
     keepassxc
     libreoffice
     mellowplayer
+    pavucontrol
     qucs
     remmina
     shotcut
@@ -26,6 +27,7 @@
     thunderbird
     transmission
     vlc
+    volctl
     wireshark
     xournalpp
     zoom-us
