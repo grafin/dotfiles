@@ -12,6 +12,7 @@
       ./i3.nix
       ./packages/default.nix
       ./packages/gui/default.nix
+      ./nemuvm.nix
     ];
 
   # Use systemd-boot EFI boot loader.
