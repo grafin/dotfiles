@@ -1,4 +1,4 @@
-{ stdenv, config, lib, fetchFromGitHub, fetchpatch
+{ stdenv, config, lib, fetchFromGitHub, fetchpatch, installShellFiles
 , cmake
 , pkg-config
 , gettext
@@ -54,7 +54,7 @@ stdenv.mkDerivation rec {
     (isEnabled "MACVTAP")
   ];
 
-  nativeBuildInputs = [ cmake pkg-config ];
+  nativeBuildInputs = [ cmake pkg-config installShellFiles ];
 
   buildInputs = [
     gettext
@@ -120,6 +120,10 @@ stdenv.mkDerivation rec {
 
   preInstall = ''
     install -D -m0644 -t $out/share/doc ../LICENSE
+  '';
+
+  postInstall = ''
+    installShellCompletion --bash $out/share/nemu/scripts/nemu.bash
   '';
 
   meta = {
