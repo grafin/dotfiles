@@ -1,12 +1,7 @@
 { config, pkgs, ... }:
 
 let
-  # We need to do this, because tigervnc pakage includes some unfree fonts...
-  unfreeConfig = config.nixpkgs.config // {
-    allowUnfree = true;
-  };
-
-  nixpkgs = import <nixpkgs> { config = unfreeConfig; };
+  nixpkgs = import <nixpkgs> { config = config.nixpkgs.config; };
 
   nemu = nixpkgs.callPackage ./pkgs/nemu.nix {
     withDbus = true;
