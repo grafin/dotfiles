@@ -1,0 +1,17 @@
+diff --git a/bin/schroot/CMakeLists.txt b/bin/schroot/CMakeLists.txt
+index 0d5f1b97..4033646c 100644
+--- a/bin/schroot/CMakeLists.txt
++++ b/bin/schroot/CMakeLists.txt
+@@ -37,11 +37,7 @@ add_executable(schroot ${schroot_sources})
+ target_link_libraries(schroot sbuild schroot-base schroot-common)
+ 
+ install(TARGETS schroot RUNTIME
+-        DESTINATION ${CMAKE_INSTALL_FULL_BINDIR}
+-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+-                    GROUP_READ GROUP_EXECUTE
+-                    WORLD_READ WORLD_EXECUTE
+-                    SETUID)
++        DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+ 
+ set(installdirs
+     ${SCHROOT_CONF_CHROOT_D}

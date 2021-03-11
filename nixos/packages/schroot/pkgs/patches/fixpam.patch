@@ -1,0 +1,13 @@
+diff --git a/etc/pam/CMakeLists.txt b/etc/pam/CMakeLists.txt
+index 43a26c7e..c9d2d6e3 100644
+--- a/etc/pam/CMakeLists.txt
++++ b/etc/pam/CMakeLists.txt
+@@ -17,7 +17,7 @@
+ #####################################################################
+ 
+ set(pam_data schroot)
+-set(pam_dir "/etc/pam.d")
++set(pam_dir "${CMAKE_INSTALL_SYSCONFDIR}/pam.d")
+ 
+ install(FILES ${pam_data}
+         DESTINATION ${pam_dir})
