@@ -23,9 +23,11 @@
     sourcetrail
     sublime-merge
     sublime3
+    tigervnc
     tdesktop
     thunderbird
     transmission
+    virtviewer
     vlc
     volctl
     wireshark

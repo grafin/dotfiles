@@ -7,11 +7,9 @@
     haskellPackages.update-nix-fetchgit
     killall
     nix-prefetch-git
-    tigervnc
     tmux
     tree
     vim
-    virtviewer
     wget
   ];
 
