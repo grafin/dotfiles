@@ -78,5 +78,5 @@ export HISTTIMEFORMAT='%d/%m/%y %T '
 alias go='http_proxy=172.17.0.1:3128 go'
 alias pssh='ssh -o "ProxyCommand /usr/bin/ncat --proxy-type http --proxy 172.17.0.1:3128 %h %p"'
 
-# publican from container
-alias publican="podman run -t -i -v $(pwd):/mnt svendowideit/publican"
+# kitty SSH
+alias ssh='TERM=xterm-256color ssh'
