@@ -7,7 +7,6 @@
     dbeaver
     deadbeef
     discord
-    dropbox
     firefox
     geogebra
     gimp
@@ -28,7 +27,6 @@
     transmission
     virtviewer
     vlc
-    volctl
     wireshark
     xournalpp
     zoom-us
