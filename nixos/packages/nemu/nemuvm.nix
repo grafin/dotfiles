@@ -30,7 +30,10 @@ with lib;
   config = mkIf cfg.enable {
     systemd.services.nemuvm = {
       description = "Service, which starts/stops nemu's VMs ";
-      after = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "nemu-veth.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         User = "${cfg.user}";
