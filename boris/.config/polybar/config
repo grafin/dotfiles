@@ -1,0 +1,132 @@
+[colors]
+bg = #2F343F
+inactive-bg = #2F343F
+text = #F3F4F5
+inactive-text = #676E7D
+urgent-bg = #E53935
+
+[bar/top]
+ienable-ipc = true
+wm-restack = i3
+background = ${colors.bg}
+
+font-0 = "Open Sans:style=Regular:pixelsize=10;0"
+font-1 = "Font Awesome 5 Free,Font Awesome 5 Free Regular:style=Regular:pixelsize=10;0"
+font-2 = "Font Awesome 5 Brands,Font Awesome 5 Brands Regular:style=Regular:pixelsize=10;0"
+font-3 = "Font Awesome 5 Free,Font Awesome 5 Free Solid:style=Solid:pixelsize=10;0"
+
+module-margin = 2
+modules-left = i3
+modules-center = title
+modules-right = homefs rootfs memory cpu cpu_temp lan vipnet vpn pulseaudio xkeyboard date
+
+[module/i3]
+type = internal/i3
+pin-workspaces = true
+strip-wsnumbers = true
+index-sort = true
+enable-click = true
+enable-scroll = true
+wrapping-scroll = false
+reverse-scroll = false
+fuzzy-match = true
+
+label-separator = |
+label-separator-padding = 1
+label-separator-foreground = ${colors.inactive-text}
+
+label-focused = %{F#F3F4F5}%{T4}%icon%
+label-unfocused = %{F#676E7D}%{T4}%icon%
+label-urgent = %{F#676E7D}%{T4}%icon%
+label-urgent-background = ${colors.urget-bg}
+
+ws-icon-default = 
+ws-icon-0 = tty;
+ws-icon-1 = mail;
+ws-icon-2 = web;%{T3}
+ws-icon-3 = files;
+ws-icon-4 = sublime_text;
+ws-icon-5 = sublime_merge;
+ws-icon-6 = telegram;%{T3}
+ws-icon-7 = jitsi;
+ws-icon-8 = windows;%{T3}
+ws-icon-9 = music;
+
+[module/title]
+type = internal/xwindow
+
+[module/date]
+type = internal/date
+date = %Y-%m-%d%
+time = %H:%M
+date-alt = %A, %d %B %Y
+time-alt = %H:%M:%S
+label = %date% %time%
+
+[module/lan]
+type = internal/network
+interface = enp3s0
+label-connected = %{T4}  %{T1}%downspeed:3%
+label-disconnected = %{T4}
+label-disconnected-foreground = #f00
+
+[module/vipnet]
+type = internal/network
+interface = veth_vipnet_0
+unknown-as-up = true
+label-connected = %{T4} %{T1}%downspeed:3%
+label-disconnected = %{T4}
+label-disconnected-foreground = #f00
+
+[module/vpn]
+type = internal/network
+interface = wg0
+unknown-as-up = true
+label-connected = %{T4} %{T1}%downspeed:3%
+label-disconnected = %{T4}
+label-disconnected-foreground = #f00
+
+[module/rootfs]
+type = internal/fs
+mount-0 = /
+label-mounted = %{T4}  %{T1}%percentage_used%%
+label-unmounted = %{T4}
+label-unmounted-foreground = ${colors.inactive-text}
+
+[module/homefs]
+type = internal/fs
+mount-0 = /home
+label-mounted = %{T4}  %{T1}%percentage_used%%
+label-unmounted = %{T4}
+label-unmounted-foreground = ${colors.inactive-text}
+
+[module/memory]
+type = internal/memory
+label = %{T4}  %{T1}%percentage_used%%
+
+[module/cpu]
+type = internal/cpu
+label = %{T4}  %{T1}%percentage%%
+
+[module/cpu_temp]
+type = internal/temperature
+thermal-zone = 2
+hwmon-path = /sys/devices/platform/coretemp.0/hwmon/hwmon1/temp1_input
+label = %{T4} %{T1}%temperature-c%
+label-warn = %{T4} %{T1}%temperature-c%
+warn-temperature = 70
+label-warn-foreground = #f00
+
+[module/pulseaudio]
+type = internal/pulseaudio
+use-ui-max = false
+format-volume = <label-volume>
+label-volume = %{T4} %{T1}%percentage%%
+label-muted = %{T4}    %{T1}%percentage%%
+label-muted-foreground = ${colors.inactive-text}
+interval = 5
+click-right = pavucontrol
+
+[module/xkeyboard]
+type = internal/xkeyboard
+format = <label-layout>
