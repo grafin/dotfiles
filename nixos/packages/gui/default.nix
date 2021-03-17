@@ -11,7 +11,6 @@
     firefox
     geogebra
     gimp
-    jitsi
     keepassxc
     libreoffice
     mellowplayer
@@ -33,5 +32,9 @@
     wireshark
     xournalpp
     zoom-us
+  ];
+
+  imports = [
+    ./jitsi/jitsi.nix
   ];
 }
