@@ -61,6 +61,7 @@
       xkbOptions = "grp:caps_toggle,grp_led:caps";
       xkbVariant = "winkeys";
     };
+    devmon.enable = true;
   };
 
   # Internationalisation properties.
