@@ -52,5 +52,29 @@
     };
 
     nameservers = [ "172.17.0.1" ];
+
+    firewall = {
+      allowedUDPPorts = [
+        55777 # WG
+      ];
+    };
+
+    wireguard.interfaces = {
+      wg0 = {
+        ips = [ "172.16.0.2/16" ];
+        listenPort = 55777;
+
+        privateKeyFile = "/root/wireguard/private-mainhost.key";
+
+        peers = [
+          {
+            publicKey = "xWmKFQiiAKLP7mE1+grvLWUqHDgchOlR/4YhtV+mgAg=";
+            allowedIPs = [ "172.16.0.0/16" ];
+            endpoint = "stepanenko.pw:55777";
+            persistentKeepalive = 25;
+          }
+        ];
+      };
+    };
   };
 }
