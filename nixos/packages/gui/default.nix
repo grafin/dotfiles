@@ -22,9 +22,9 @@
     sourcetrail
     sublime-merge
     sublime3
-    tigervnc
     tdesktop
     thunderbird
+    tigervnc
     transmission
     virtviewer
     vlc
