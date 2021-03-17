@@ -7,13 +7,17 @@
     dbeaver
     deadbeef
     discord
+    evince
     firefox
+    flameshot
     geogebra
     gimp
+    gnome3.nautilus
     keepassxc
     libreoffice
     mellowplayer
     pavucontrol
+    qalculate-gtk
     qucs
     remmina
     shotcut
@@ -28,6 +32,8 @@
     virtviewer
     vlc
     wireshark
+    xdg-launch
+    xdg-utils
     xournalpp
     zoom-us
   ];
