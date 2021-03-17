@@ -2,13 +2,19 @@
 
 {
   environment.systemPackages = with pkgs; [
+    file
     git
     gnupg
     haskellPackages.update-nix-fetchgit
     killall
+    maestral
     nix-prefetch-git
+    nnn
+    p7zip
+    ranger
     tmux
     tree
+    udiskie
     wget
   ];
 
