@@ -9,7 +9,6 @@
     nix-prefetch-git
     tmux
     tree
-    vim
     wget
   ];
 
@@ -17,5 +16,6 @@
     ./nemu/nemu.nix
     ./nemu/nemu-veth.nix
     ./schroot/schroot.nix
+    ./vim/vim.nix
   ];
 }
