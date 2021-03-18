@@ -35,13 +35,14 @@ bindsym XF86Calculator exec qalculate-gtk
 # Remove title-bars
 for_window [class="^.*"] border pixel 1
 
-# Autostart tray apps
+# Set terminal
+set $term kitty
 
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
 # start a terminal
-bindsym $mod+Return exec --no-startup-id kitty
+bindsym $mod+Return exec --no-startup-id $term
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -120,7 +121,7 @@ set $ws11 "11:1"
 set $ws12 "12:2"
 
 # Autostart GUI apps
-exec i3-msg 'workspace $ws1; exec kitty'
+exec i3-msg 'workspace $ws1; exec $term'
 exec i3-msg 'workspace $ws2; exec thunderbird'
 exec i3-msg 'workspace $ws3; exec firefox'
 exec i3-msg 'workspace $ws4; exec nautilus'
