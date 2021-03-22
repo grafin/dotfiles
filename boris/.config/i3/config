@@ -124,7 +124,7 @@ set $ws12 "12:2"
 exec i3-msg 'workspace $ws1; exec $term'
 exec i3-msg 'workspace $ws2; exec thunderbird'
 exec i3-msg 'workspace $ws3; exec firefox'
-exec i3-msg 'workspace $ws4; exec nautilus'
+exec i3-msg 'workspace $ws4; exec ranger'
 exec i3-msg 'workspace $ws5; exec sublime_text'
 exec i3-msg 'workspace $ws6; exec sublime_merge'
 exec i3-msg 'workspace $ws7; exec telegram-desktop'
@@ -135,7 +135,6 @@ exec i3-msg 'workspace $ws10; exec MellowPlayer'
 # Assign windows to workspaces
 assign [class="Thunderbird"]        $ws2
 assign [class="Firefox"]            $ws3
-assign [class="Org.gnome.Nautilus"] $ws4
 assign [class="Sublime_text"]       $ws5
 assign [class="Sublime_merge"]      $ws6
 assign [class="TelegramDesktop"]    $ws7
