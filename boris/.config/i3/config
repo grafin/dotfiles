@@ -79,6 +79,9 @@ bindsym $mod+Shift+Down move down
 bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
+# bind windows to all workspaces
+bindsym $mod+Tab sticky toggle
+
 # split in horizontal orientation
 bindsym $mod+h split h
 
