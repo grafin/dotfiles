@@ -13,6 +13,7 @@
       ./packages/default.nix
       ./packages/gui/default.nix
       ./nemuvm.nix
+      ./samba.nix
     ];
 
   # Use systemd-boot EFI boot loader.
