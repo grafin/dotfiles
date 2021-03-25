@@ -54,7 +54,10 @@
     nameservers = [ "172.17.0.1" ];
 
     firewall = {
+      enable = true;
+      allowPing = true;
       allowedUDPPorts = [
+        22 # SSH
         55777 # WG
       ];
     };
