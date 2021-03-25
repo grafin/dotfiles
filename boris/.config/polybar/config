@@ -85,12 +85,9 @@ label-disconnected = %{T4}
 label-disconnected-foreground = #f00
 
 [module/vpn]
-type = internal/network
-interface = wg0
-unknown-as-up = true
-label-connected = %{T4} %{T1}%downspeed:3%
-label-disconnected = %{T4}
-label-disconnected-foreground = #f00
+type = custom/script
+tail = true
+exec = /home/boris/.config/polybar/wireguard.sh
 
 [module/rootfs]
 type = internal/fs
