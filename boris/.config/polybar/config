@@ -7,13 +7,17 @@ urgent-bg = #E53935
 
 [bar/top]
 ienable-ipc = true
-wm-restack = i3
+;override-redirect = true
+;wm-restack = i3
 background = ${colors.bg}
 
 font-0 = "Open Sans:style=Regular:pixelsize=10;0"
 font-1 = "Font Awesome 5 Free,Font Awesome 5 Free Regular:style=Regular:pixelsize=10;0"
 font-2 = "Font Awesome 5 Brands,Font Awesome 5 Brands Regular:style=Regular:pixelsize=10;0"
 font-3 = "Font Awesome 5 Free,Font Awesome 5 Free Solid:style=Solid:pixelsize=10;0"
+
+tray-position = center
+tray-detached = false
 
 module-margin = 2
 modules-left = i3
@@ -32,13 +36,15 @@ reverse-scroll = false
 fuzzy-match = true
 
 label-separator = |
-label-separator-padding = 1
 label-separator-foreground = ${colors.inactive-text}
 
 label-focused = %{F#F3F4F5}%{T4}%icon%
+label-focused-padding = 1
 label-unfocused = %{F#676E7D}%{T4}%icon%
+label-unfocused-padding = 1
 label-urgent = %{F#676E7D}%{T4}%icon%
-label-urgent-background = ${colors.urget-bg}
+label-urgent-padding = 1
+label-urgent-background = ${colors.urgent-bg}
 
 ws-icon-default = 
 ws-icon-0 = tty;
