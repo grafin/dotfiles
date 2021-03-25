@@ -3,6 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     file
+    gdb
     git
     gnupg
     haskellPackages.update-nix-fetchgit
