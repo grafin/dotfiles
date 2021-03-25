@@ -12,10 +12,10 @@
     flameshot
     geogebra
     gimp
-    gnome3.nautilus
     keepassxc
     libreoffice
     mellowplayer
+    obs-studio
     pavucontrol
     qalculate-gtk
     qucs
