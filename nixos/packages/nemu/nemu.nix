@@ -10,15 +10,26 @@ let
     withUTF = true;
   };
 in {
-  environment.systemPackages = with pkgs; [
-    nemu
+
+  imports = [
+    ./module.nix
   ];
 
-  security.wrappers.nemu = {
-    source = "${nemu}/bin/nemu";
-    capabilities = "cap_net_admin+ep";
-    owner = "root";
-    group = "root";
-    permissions = "u+rx,g+rx,a+rx";
+  programs.nemu = {
+    package = nemu;
+    enable = true;
+    vhostNetGroup = "vhost";
+    macvtapGroup = "vhost";
+    usbGroup = "usb";
+    users = {
+      boris = {
+        autoAddVeth = true;
+        autoStartVMs = [
+          "CentOS-ViPNet"
+          "Minecraft"
+          "Windows-ViPNet"
+        ];
+      };
+    };
   };
 }

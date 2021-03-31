@@ -21,7 +21,6 @@
 
   imports = [
     ./nemu/nemu.nix
-    ./nemu/nemu-veth.nix
     ./schroot/schroot.nix
     ./udevil/udevil.nix
     ./vim/vim.nix

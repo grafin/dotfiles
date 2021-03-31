@@ -12,7 +12,6 @@
       ./i3.nix
       ./packages/default.nix
       ./packages/gui/default.nix
-      ./nemuvm.nix
       ./samba.nix
     ];
 
@@ -86,19 +85,6 @@
     pinentryFlavor = "gnome3";
   };
 
-  # udev rules
-  services.udev.extraRules = ''
-    KERNEL=="vhost-net", MODE="0660", GROUP="vhost"
-    SUBSYSTEM=="usb", MODE="0664", GROUP="usb"
-    SUBSYSTEM=="macvtap", MODE="0660", GROUP="vhost"
-  '';
-
-  # Groups
-  users.groups = {
-    vhost = { };
-    usb = { };
-  };
-
   # Users
   users.users.boris = {
     isNormalUser = true;
@@ -106,9 +92,6 @@
     description = "Stepanenko Boris";
     extraGroups = [
       "wheel"
-      "kvm"
-      "vhost"
-      "usb"
     ];
   };
 

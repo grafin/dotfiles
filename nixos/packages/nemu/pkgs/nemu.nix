@@ -25,17 +25,21 @@
 , withSpice ? true
 , withUTF ? false
 , withVNC ? true
+
+, configName ? ".config/nemu/nemu.cfg"
+, vmDir ? ".local/share/nemu/vms"
+, databaseName ? ".local/share/nemu/nemu.db"
 }:
 
 stdenv.mkDerivation rec {
   pname = "nemu";
-  version = "2021-03-09";
+  version = "2021-03-29";
 
   src = fetchFromGitHub {
     owner = "nemuTUI";
     repo = "nemu";
-    rev = "8f847bcca7e8f114471f3c2f70bab495eba01d1c";
-    sha256 = "07mq3v0wldvsmfn3ypaq6xgc8g6cm58dkb5k2a5mybzxdjb9n60q";
+    rev = "0de0649a94160cdec94619272969194dcb41a470";
+    sha256 = "015fp66j3x47w35kj1g3ny852v0lfvv8k863cfvksd0q06gmdarb";
   };
 
   qemu_ = if withSnapshots
@@ -73,7 +77,15 @@ stdenv.mkDerivation rec {
     ++ lib.optional withSpice virtviewer
     ++ lib.optional withVNC tigervnc;
 
-  cmakeFlags = lib.optional withDbus "-DNM_WITH_DBUS=ON"
+  cmakeFlags = [
+    "-DNM_CFG_NAME=${configName}"
+    "-DNM_DEFAULT_VMDIR=${vmDir}"
+    "-DNM_DEFAULT_VNC=${tigervnc}/bin/vncviewer"
+    "-DNM_DEFAULT_DBFILE=${databaseName}"
+    "-DNM_DEFAULT_SPICE=${virtviewer}/bin/remote-viewer"
+    "-DNM_DEFAULT_QEMUDIR=${qemu_}/bin"
+  ]
+    ++ lib.optional withDbus "-DNM_WITH_DBUS=ON"
     ++ lib.optional withNetworkMap "-DNM_WITH_NETWORK_MAP=ON"
     ++ lib.optional withOVF "-DNM_WITH_OVF_SUPPORT=ON"
     ++ lib.optional withSnapshots "-DNM_SAVEVM_SNAPSHOTS=ON"
@@ -102,17 +114,11 @@ stdenv.mkDerivation rec {
     substituteInPlace sh/ntty --replace \
       /usr/bin/picocom ${picocom}/bin/picocom
 
+    substituteInPlace sh/upgrade_db.sh --replace \
+      sqlite3 ${sqlite}/bin/sqlite3
+
     substituteInPlace sh/setup_nemu_nonroot.sh --replace \
       /usr/bin/nemu $out/bin/$pname
-
-    substituteInPlace src/nm_cfg_file.c --replace \
-      /usr/bin/vncviewer ${tigervnc}/bin/vncviewer
-
-    substituteInPlace src/nm_cfg_file.c --replace \
-      /usr/bin/remote-viewer ${virtviewer}/bin/remote-viewer
-
-    substituteInPlace src/nm_cfg_file.c --replace \
-      'NM_DEFAULT_QEMUDIR[]  = "/usr/bin"' "NM_DEFAULT_QEMUDIR[]  = \"${qemu_}/bin\""
 
     substituteInPlace src/nm_cfg_file.c --replace \
       /bin/false /run/current-system/sw/bin/false
