@@ -19,6 +19,8 @@
     wget
   ];
 
+  programs.mtr.enable = true;
+
   imports = [
     ./nemu/nemu.nix
     ./schroot/schroot.nix
