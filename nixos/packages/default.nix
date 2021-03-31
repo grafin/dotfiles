@@ -12,6 +12,7 @@
     nix-prefetch-git
     nnn
     p7zip
+    python39Packages.flake8
     ranger
     tmux
     tree
