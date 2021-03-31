@@ -130,7 +130,7 @@ set $ws12 "12:2"
 exec i3-msg 'workspace $ws1; exec $term'
 exec i3-msg 'workspace $ws2; exec thunderbird'
 exec i3-msg 'workspace $ws3; exec firefox'
-exec i3-msg 'workspace $ws4; exec ranger'
+exec i3-msg 'workspace $ws4; exec $term ranger'
 exec i3-msg 'workspace $ws5; exec sublime_text'
 exec i3-msg 'workspace $ws6; exec sublime_merge'
 exec i3-msg 'workspace $ws7; exec telegram-desktop'
