@@ -18,7 +18,7 @@
       extraPackages = with pkgs; [
         compton
         dunst
-        i3lock
+        i3lock-fancy-rapid
         kitty
         libnotify
         lxappearance

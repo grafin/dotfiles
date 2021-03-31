@@ -47,6 +47,9 @@ bindsym $mod+Return exec --no-startup-id $term
 # kill focused window
 bindsym $mod+Shift+q kill
 
+# lock screen
+bindsym $mod+Escape exec i3lock-fancy-rapid 8 pixel
+
 # Screenshots
 bindsym Print exec --no-startup-id flameshot full --clipboard
 bindsym Shift+Print exec --no-startup-id flameshot gui
