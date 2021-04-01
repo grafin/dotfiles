@@ -33,13 +33,13 @@
 
 stdenv.mkDerivation rec {
   pname = "nemu";
-  version = "2021-03-29";
+  version = "2021-04-01";
 
   src = fetchFromGitHub {
     owner = "nemuTUI";
     repo = "nemu";
-    rev = "0de0649a94160cdec94619272969194dcb41a470";
-    sha256 = "015fp66j3x47w35kj1g3ny852v0lfvv8k863cfvksd0q06gmdarb";
+    rev = "9fff326adc1c5fc27cddeedc2c091e5bb2a24347";
+    sha256 = "10gis2fckjhj4ln9gb02qbcin82rx98fi6zh0wi5k1xpj8bmqcci";
   };
 
   qemu_ = if withSnapshots
