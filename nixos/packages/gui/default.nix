@@ -16,6 +16,7 @@
     libreoffice
     mellowplayer
     obs-studio
+    octaveFull
     pavucontrol
     qalculate-gtk
     qucs
