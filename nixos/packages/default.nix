@@ -6,10 +6,11 @@
     cppcheck
     file
     gdb
-    git
+    gitFull
     gnupg
     haskellPackages.update-nix-fetchgit
     killall
+    lazygit
     maestral
     nix-prefetch-git
     nnn
