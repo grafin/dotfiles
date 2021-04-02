@@ -2,6 +2,8 @@
 
 {
   environment.systemPackages = with pkgs; [
+    codespell
+    cppcheck
     file
     gdb
     git
