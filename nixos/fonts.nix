@@ -5,6 +5,7 @@
     font-awesome
     fira-code
     fira-code-symbols
+    lmodern
     opensans-ttf
   ];
 }
