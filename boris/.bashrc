@@ -75,8 +75,8 @@ export HISTFILESIZE=131072000
 export HISTTIMEFORMAT='%d/%m/%y %T '
 
 # Go alias to use proxy
-alias go='http_proxy=172.17.0.1:3128 go'
-alias pssh='ssh -o "ProxyCommand /usr/bin/ncat --proxy-type http --proxy 172.17.0.1:3128 %h %p"'
+# alias go='http_proxy=172.17.0.1:3128 go'
+# alias pssh='ssh -o "ProxyCommand /usr/bin/ncat --proxy-type http --proxy 172.17.0.1:3128 %h %p"'
 
 # kitty SSH
 alias ssh='TERM=xterm-256color ssh'
