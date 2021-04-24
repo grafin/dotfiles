@@ -81,6 +81,7 @@
         map <F9> :call flake8#Flake8()<CR>
         map <F10> :call flake8#Flake8ShowError()<CR>
         map <F11> :call flake8#Flake8UnplaceMarkers()<CR>
+        set pastetoggle=<F12>
       '';
     }
   )];
