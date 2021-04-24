@@ -18,7 +18,6 @@
     p7zip
     python39Packages.flake8
     ranger
-    tmux
     tree
     udiskie
     wget
@@ -29,6 +28,7 @@
   imports = [
     ./nemu/nemu.nix
     ./schroot/schroot.nix
+    ./tmux/tmux.nix
     ./udevil/udevil.nix
     ./vim/vim.nix
   ];
