@@ -14,6 +14,7 @@
     gimp
     keepassxc
     libreoffice
+    lyx
     mellowplayer
     obs-studio
     octaveFull
@@ -27,6 +28,8 @@
     sublime-merge
     sublime3
     tdesktop
+    texlive.combined.scheme-full
+    texstudio
     thunderbird
     tigervnc
     transmission
