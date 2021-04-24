@@ -47,7 +47,10 @@
 
   # Services
   services = {
-    openssh.enable = true;
+    openssh = {
+      enable = true;
+      forwardX11 = true;
+    };
     printing = {
       enable = true;
       drivers = with pkgs; [
