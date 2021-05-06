@@ -1,4 +1,4 @@
-{ stdenv, config, lib, fetchFromGitHub, fetchpatch, installShellFiles
+{ stdenv, config, lib, fetchurl, fetchFromGitHub, fetchpatch, installShellFiles
 , cmake
 , pkg-config
 , gettext
@@ -42,8 +42,16 @@ stdenv.mkDerivation rec {
     sha256 = "08c3jxw2km7aq87ky2wjb3pvshjhhywgvg3w76hbmmd9i7qx06db";
   };
 
+  qemu_5 = qemu.overrideAttrs (old: rec {
+    version = "5.2.0";
+    src = fetchurl {
+      url = "https://download.qemu.org/qemu-${version}.tar.xz";
+      sha256 = "1g0pvx4qbirpcn9mni704y03n3lvkmw2c0rbcwvydyr8ns4xh66b";
+    };
+  });
+
   qemu_ = if withSnapshots
-    then qemu.overrideAttrs (attrs: {
+    then qemu_5.overrideAttrs (attrs: {
       patches = attrs.patches ++ [
         (fetchpatch {
           url = "https://raw.githubusercontent.com/nemuTUI/nemu/master/patches/qemu-qmp-savevm-5.0.0+.patch";
@@ -51,7 +59,7 @@ stdenv.mkDerivation rec {
         })
       ];
     })
-    else qemu;
+    else qemu_5;
 
   system.requiredKernelConfig = with config.lib.kernelConfig; [
     (isEnabled "VETH")
