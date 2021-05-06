@@ -39,6 +39,7 @@
     xdg-launch
     xdg-utils
     xournalpp
+    yed
     zoom-us
   ];
 
