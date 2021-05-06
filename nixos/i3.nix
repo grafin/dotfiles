@@ -26,5 +26,14 @@
         rofi
      ];
     };
+    xautolock = {
+      enable = true;
+      enableNotifier = true;
+      time = 15;
+      locker = ''${pkgs.i3lock-fancy-rapid}/bin/i3lock-fancy-rapid 8 pixel'';
+      notify = 10;
+      notifier =
+        ''${pkgs.libnotify}/bin/notify-send "Locking in 10 seconds"'';
+      };
   };
 }
