@@ -2,6 +2,10 @@
 
 {
   environment.pathsToLink = [ "/libexec" ];
+  environment.variables = {
+    _JAVA_OPTIONS = "-Dawt.useSystemAAFontSettings=lcd";
+  };
+
   services.xserver = {
     enable = true;
 
