@@ -7,6 +7,7 @@
 {
   imports = [
       ./hardware-configuration.nix
+      ./boot/systemd-boot.nix
       ./network.nix
       ./fonts.nix
       ./i3.nix
@@ -22,6 +23,9 @@
       enable = true;
       consoleMode = "keep";
       configurationLimit = 10;
+      signed = true;
+      signing-key = "/root/secure-boot/db.key";
+      signing-certificate = "/root/secure-boot/db.crt";
     };
   };
 
