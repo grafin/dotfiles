@@ -11,7 +11,7 @@
 10. keepassxc
 11. dropbox
 12. Remmina
-!13. yEd
+13. yEd
 14. libreoffice
 15. Audacity
 16. chromium
@@ -31,6 +31,7 @@
 30. wireshark
 31. xournalpp
 32. zoom
+!33.TEE-CLC
 
 # Console APPs
 1. tmux
