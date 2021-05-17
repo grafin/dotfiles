@@ -13,6 +13,7 @@
           nerdtree-git-plugin
           vim-fugitive
           vim-tmux-focus-events
+          vim-tmux-navigator
           vim-fugitive
           vim-flake8
           papercolor-theme
@@ -30,6 +31,7 @@
         set encoding=utf-8
         set tabstop=4 softtabstop=4 shiftwidth=4 expandtab
         set backspace=indent,eol,start
+        set mouse=a
 
         set number
         set colorcolumn=80,120
