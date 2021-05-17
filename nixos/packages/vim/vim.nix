@@ -32,7 +32,7 @@
         set backspace=indent,eol,start
 
         set number
-        set colorcolumn=120
+        set colorcolumn=80,120
         highlight ColorColumn ctermbg=darkgray
 
         syntax on
