@@ -9,7 +9,7 @@
     gitFull
     gnupg
     haskellPackages.update-nix-fetchgit
-    oraclejre
+    openjdk8
     killall
     lazygit
     maestral
