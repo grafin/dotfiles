@@ -26,7 +26,7 @@
     skype
     sourcetrail
     sublime-merge
-    sublime3
+    sublime4
     tdesktop
     texlive.combined.scheme-full
     texstudio
