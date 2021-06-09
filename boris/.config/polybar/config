@@ -59,6 +59,7 @@ ws-icon-9 = music;
 
 [module/title]
 type = internal/xwindow
+label-maxlen = 50
 
 [module/date]
 type = internal/date
