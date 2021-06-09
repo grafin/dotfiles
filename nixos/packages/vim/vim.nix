@@ -11,14 +11,15 @@
           YouCompleteMe
           nerdtree
           nerdtree-git-plugin
+          papercolor-theme
+          vim-flake8
           vim-fugitive
+          vim-fugitive
+          vim-lastplace
+          vim-nix
+          vim-signify
           vim-tmux-focus-events
           vim-tmux-navigator
-          vim-fugitive
-          vim-flake8
-          papercolor-theme
-          vim-nix
-          vim-lastplace
         ];
         opt = [];
       };
@@ -42,6 +43,8 @@
         autocmd ColorScheme * highlight ExtraWhitespace ctermbg=red guibg=red
         set background=light
         colorscheme PaperColor
+
+        set updatetime=100
 
         highlight link Flake8_Error      Error
         highlight link Flake8_Warning    WarningMsg
