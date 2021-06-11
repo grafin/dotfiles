@@ -20,6 +20,7 @@
     ranger
     tree
     udiskie
+    universal-ctags
     wget
   ];
 
