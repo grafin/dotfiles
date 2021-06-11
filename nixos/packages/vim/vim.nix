@@ -12,6 +12,7 @@
           nerdtree
           nerdtree-git-plugin
           papercolor-theme
+          vim-easytags
           vim-flake8
           vim-fugitive
           vim-fugitive
