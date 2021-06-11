@@ -51,6 +51,11 @@
 
   # Services
   services = {
+    logind.extraConfig = ''
+      HandlePowerKey=suspend
+      IdleAction=suspend
+      IdleActionSec=30min
+    '';
     openssh = {
       enable = true;
       forwardX11 = true;
