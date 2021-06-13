@@ -24,7 +24,6 @@
     remmina
     shotcut
     skype
-    sourcetrail
     sublime-merge
     sublime4
     tdesktop
