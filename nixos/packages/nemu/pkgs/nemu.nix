@@ -1,4 +1,4 @@
-{ stdenv, config, lib, fetchurl, fetchFromGitHub, fetchpatch, installShellFiles
+{ stdenv, config, lib, fetchFromGitHub, fetchpatch, installShellFiles
 , cmake
 , pkg-config
 , gettext
@@ -18,6 +18,7 @@
 , json_c
 , virtviewer
 , tigervnc
+, openssl
 
 , withDbus ? false
 , withNetworkMap ? false
@@ -25,6 +26,7 @@
 , withSpice ? true
 , withUTF ? false
 , withVNC ? true
+, withRemote ? false
 
 , configName ? ".config/nemu/nemu.cfg"
 , vmDir ? ".local/share/nemu/vms"
@@ -33,13 +35,13 @@
 
 stdenv.mkDerivation rec {
   pname = "nemu";
-  version = "2021-06-01";
+  version = "2021-06-13";
 
   src = fetchFromGitHub {
     owner = "nemuTUI";
     repo = "nemu";
-    rev = "a2155f2793e58a3882aecdcc07487f507ee3294c";
-    sha256 = "0y8mm14s8hmw0c0bdx4l7awfp5x22pdwgm28ks1405qjwhwgmf85";
+    rev = "31d7ca8075a2c70268d7a1d977e9908383bc4e27";
+    sha256 = "13yx63qhwm7lbnjlyzpakxc708xm8g0yhjznlq4hcnamqk8i38hh";
   };
 
   system.requiredKernelConfig = with config.lib.kernelConfig; [
@@ -65,7 +67,8 @@ stdenv.mkDerivation rec {
     ++ lib.optional withNetworkMap graphviz
     ++ lib.optionals withOVF [ libxml2 libarchive ]
     ++ lib.optional withSpice virtviewer
-    ++ lib.optional withVNC tigervnc;
+    ++ lib.optional withVNC tigervnc
+    ++ lib.optional withRemote openssl;
 
   cmakeFlags = [
     "-DNM_CFG_NAME=${configName}"
@@ -80,7 +83,8 @@ stdenv.mkDerivation rec {
     ++ lib.optional withOVF "-DNM_WITH_OVF_SUPPORT=ON"
     ++ lib.optional withSpice "-DNM_WITH_SPICE=ON"
     ++ lib.optional withUTF "-DNM_USE_UTF=ON"
-    ++ lib.optional withVNC "-DNM_WITH_VNC_CLIENT=ON";
+    ++ lib.optional withVNC "-DNM_WITH_VNC_CLIENT=ON"
+    ++ lib.optional withRemote "-DNM_WITH_REMOTE=ON";
 
   preConfigure = ''
     patchShebangs .
