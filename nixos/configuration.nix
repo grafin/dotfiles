@@ -111,4 +111,7 @@
   environment.systemPackages = with pkgs; [
     home-manager
   ];
+
+  # Man
+  documentation.dev.enable = true;
 }
