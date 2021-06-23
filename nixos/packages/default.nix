@@ -9,12 +9,13 @@
     gitFull
     gnupg
     haskellPackages.update-nix-fetchgit
-    openjdk8
+    inetutils
     killall
     lazygit
     maestral
     nix-prefetch-git
     nnn
+    openjdk8
     p7zip
     python39Packages.flake8
     ranger
