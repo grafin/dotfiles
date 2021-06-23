@@ -114,6 +114,7 @@
   environment.systemPackages = with pkgs; [
     home-manager
   ];
+  nix.autoOptimiseStore = true;
 
   # Man
   documentation.dev.enable = true;
