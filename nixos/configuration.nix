@@ -71,6 +71,7 @@
       ];
     };
     devmon.enable = true;
+    fail2ban.enable = true;
   };
 
   # Internationalisation properties.
