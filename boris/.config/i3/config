@@ -217,7 +217,7 @@ exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 exec_always --no-startup-id picom -f --vsync --backend glx
 exec_always --no-startup-id maestral start
 
-set $bg-color 	         #2f343f
+set $bg-color            #2f343f
 set $inactive-bg-color   #2f343f
 set $text-color          #f3f4f5
 set $inactive-text-color #676E7D
