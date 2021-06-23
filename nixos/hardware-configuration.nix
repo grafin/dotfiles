@@ -54,10 +54,10 @@
     xserver = {
       videoDrivers = [ "modesetting" ];
       useGlamor = true;
+      layout = "us,ru";
       xkbModel = "microsoft";
-      layout = "us,ru(winkeys)";
-      xkbOptions = "grp:caps_toggle,grp_led:caps";
-      xkbVariant = "winkeys";
+      xkbOptions = "grp:caps_toggle,grp_led:caps,terminate:ctrl_alt_bksp";
+      displayManager.sessionCommands = "setxkbmap";
     };
   };
 }
