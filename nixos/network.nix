@@ -73,7 +73,7 @@
           {
             publicKey = "xWmKFQiiAKLP7mE1+grvLWUqHDgchOlR/4YhtV+mgAg=";
             allowedIPs = [ "172.16.0.0/16" ];
-            endpoint = "stepanenko.pw:55777";
+            endpoint = "142.47.104.94:55777";
             persistentKeepalive = 25;
           }
         ];
