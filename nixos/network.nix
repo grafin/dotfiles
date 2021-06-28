@@ -51,7 +51,10 @@
       ];
     };
 
-    nameservers = [ "172.17.0.1" ];
+    nameservers = [
+      "172.17.0.1"
+      "192.168.1.1"
+    ];
 
     firewall = {
       enable = true;
