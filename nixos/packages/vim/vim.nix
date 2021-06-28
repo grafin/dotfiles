@@ -63,6 +63,8 @@
 
         let g:ycm_key_list_stop_completion = ["<C-y>", "<TAB>"]
 
+        let g:easytags_async = 1
+
         autocmd FileType make set tabstop=4 softtabstop=0 shiftwidth=4 noexpandtab
         autocmd FileType cmake set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 
