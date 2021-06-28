@@ -15,7 +15,6 @@
           vim-easytags
           vim-flake8
           vim-fugitive
-          vim-fugitive
           vim-lastplace
           vim-nix
           vim-signify
