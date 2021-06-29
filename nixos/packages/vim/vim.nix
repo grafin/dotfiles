@@ -17,6 +17,8 @@
           vim-fugitive
           vim-lastplace
           vim-nix
+          vim-obsession
+          vim-prosession
           vim-signify
           vim-tmux-focus-events
           vim-tmux-navigator
