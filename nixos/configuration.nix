@@ -14,6 +14,7 @@
       ./packages/default.nix
       ./packages/gui/default.nix
       ./samba.nix
+      ./secret.nix
     ];
 
   # Use systemd-boot EFI boot loader.
