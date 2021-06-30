@@ -115,6 +115,7 @@
     "cnijfilter2"
     "discord"
     "font-bh-lucidatypewriter"
+    "font-bh-lucidatypewriter-75dpi"
     "geogebra"
     "skypeforlinux"
     "sublime-merge"
