@@ -22,6 +22,7 @@
     tree
     udiskie
     universal-ctags
+    usbutils
     wget
   ];
 
