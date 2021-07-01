@@ -8,7 +8,11 @@
     deadbeef
     discord
     evince
-    firefox
+    (firefox.override {
+      cfg = {
+        enableTridactylNative = true;
+      };
+    })
     flameshot
     geogebra
     gimp
@@ -32,6 +36,7 @@
     thunderbird
     tigervnc
     transmission
+    tridactyl-native
     virtviewer
     vlc
     wireshark
