@@ -39,6 +39,9 @@
 3. git
 4. nemu
 
+# Backup
+!1. rsnapshot
+
 # vim plugins
 VundleVim/Vundle.vim
 grafin/YouCompleteMe
