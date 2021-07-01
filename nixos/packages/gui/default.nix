@@ -26,6 +26,7 @@
     qalculate-gtk
     qucs
     remmina
+    screenkey
     shotcut
     skype
     sublime-merge
