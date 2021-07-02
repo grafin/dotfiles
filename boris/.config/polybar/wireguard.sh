@@ -33,14 +33,23 @@ function connection_rx() {
     echo $(cat "/sys/class/net/${CONNECTION}/statistics/rx_bytes" 2>/dev/null)
 }
 
+function connection_tx() {
+    echo $(cat "/sys/class/net/${CONNECTION}/statistics/tx_bytes" 2>/dev/null)
+}
+
 RX_BYTES=0
+TX_BYTES=0
 while true; do
     if [ $(connection_status) -eq 1 ]; then
         PREV_RX_BYTES="${RX_BYTES}"
+        PREV_TX_BYTES="${TX_BYTES}"
         RX_BYTES=$(connection_rx)
+        TX_BYTES=$(connection_tx)
         DOWN_KB=$(calc "(${RX_BYTES} - ${PREV_RX_BYTES}) / 1024 / ${AVG_TIME}")
+        UP_KB=$(calc "(${TX_BYTES} - ${PREV_TX_BYTES}) / 1024 / ${AVG_TIME}")
         DOWN_RATE=$(human "${DOWN_KB}")
-        echo "%{T4} %{T1}${DOWN_RATE}"
+        UP_RATE=$(human "${UP_KB}")
+        echo "%{T4} %{T1}${DOWN_RATE}%{T4} %{T1}${UP_RATE}"
     else
         echo "%{F#f00}%{T4}"
     fi

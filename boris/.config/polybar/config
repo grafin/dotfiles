@@ -72,7 +72,7 @@ label = %date% %time%
 [module/lan]
 type = internal/network
 interface = enp3s0
-label-connected = %{T4}  %{T1}%downspeed:3%
+label-connected = %{T4} %{T1}%downspeed:3%%{T4} %{T1}%upspeed:3%
 label-disconnected = %{T4}
 label-disconnected-foreground = #f00
 
@@ -80,7 +80,7 @@ label-disconnected-foreground = #f00
 type = internal/network
 interface = veth_vipnet_0
 unknown-as-up = true
-label-connected = %{T4} %{T1}%downspeed:3%
+label-connected = %{T4} %{T1}%downspeed:3%%{T4} %{T1}%upspeed:3%
 label-disconnected = %{T4}
 label-disconnected-foreground = #f00
 
