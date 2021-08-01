@@ -52,8 +52,8 @@
     };
 
     nameservers = [
-      "172.17.0.1"
       "192.168.1.1"
+      "172.17.0.1"
     ];
 
     firewall = {
@@ -62,6 +62,10 @@
       allowedUDPPorts = [
         22 # SSH
         55777 # WG
+      ];
+      allowedTCPPorts = [
+        22 # SSH
+        20509 # nemu
       ];
     };
 
