@@ -17,7 +17,6 @@
     nnn
     openjdk8
     p7zip
-    python39Packages.flake8
     ranger
     tree
     udiskie
@@ -30,6 +29,7 @@
 
   imports = [
     ./nemu/nemu.nix
+    ./python/python.nix
     ./schroot/schroot.nix
     ./tmux/tmux.nix
     ./udevil/udevil.nix
