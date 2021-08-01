@@ -9,6 +9,7 @@
       vimrcConfig.packages.myplugins = with pkgs.vimPlugins; {
         start = [
           YouCompleteMe
+          lightline-vim
           nerdtree
           nerdtree-git-plugin
           papercolor-theme
@@ -39,6 +40,9 @@
         set number
         set colorcolumn=80,120
         highlight ColorColumn ctermbg=darkgray
+        set noshowmode
+        set laststatus=2
+        let g:lightline = {'colorscheme': 'PaperColor',}
 
         syntax on
         set t_Co=256
