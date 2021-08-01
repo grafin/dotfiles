@@ -59,6 +59,7 @@ function print_chroot {
 }
 
 export PS1="┌─┤\[\033[31m\]\u\[\033[m\]@\[\033[31m\]\h\[\033[m\]├\`print_chroot\`\[\033[m\]─┤\[\033[34m\]\d \A\[\033[m\]├─┤\[\e[m\]\[\033[35m\]\w\[\033[m\]\`parse_git_branch\`│\n└─\\$ "
+export HISTCONTROL=ignoreboth:erasedups
 
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=
