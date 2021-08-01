@@ -81,3 +81,6 @@ export HISTTIMEFORMAT='%d/%m/%y %T '
 
 # kitty SSH
 alias ssh='TERM=xterm-256color ssh'
+
+# rsync
+alias cpv='rsync -vhae ssh --progress'
