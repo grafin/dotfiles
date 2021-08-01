@@ -7,6 +7,7 @@ let
     withDbus = true;
     withNetworkMap = true;
     withUTF = true;
+    withRemote = true;
   };
 in {
 
