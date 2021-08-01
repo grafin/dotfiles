@@ -112,6 +112,7 @@
 
   # Packages
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+    "android-studio-stable"
     "cnijfilter2"
     "discord"
     "font-bh-lucidatypewriter"

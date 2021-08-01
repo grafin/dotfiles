@@ -2,6 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
+    android-studio
     audacity
     chromium
     dbeaver
