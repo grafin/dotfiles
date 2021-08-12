@@ -22,6 +22,7 @@
     udiskie
     universal-ctags
     usbutils
+    valgrind
     wget
   ];
 
