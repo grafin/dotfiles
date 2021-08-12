@@ -24,6 +24,7 @@ in {
     users = {
       boris = {
         autoAddVeth = true;
+        autoStartDaemon = true;
         autoStartVMs = [
           "CentOS-ViPNet"
           "Minecraft"

@@ -70,6 +70,15 @@ in {
       '';
       type = types.attrsOf (types.submodule {
         options = {
+          autoStartDaemon = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Whether to automatically start nemu daemon for user
+              during system startup.
+            '';
+          };
+
           autoAddVeth = mkOption {
             type = types.bool;
             default = false;
@@ -153,7 +162,7 @@ in {
       wantedBy = [ "nemu.target" ];
     };
 
-    # Add nemu-veth and nemu-vm systemd services for users
+    # Add nemu-daemon, nemu-veth and nemu-vm systemd services for users
     systemd.services = mapAttrs' (user: _:
       nameValuePair "nemu-veth-${user}" {
         description = "Creates veth interfaces for nemu VMs for ${user}";
@@ -165,6 +174,21 @@ in {
         wantedBy = [ "nemu-veth.target" ];
       }
     ) (filterAttrs (_: userOpts: userOpts.autoAddVeth == true) cfg.users)
+    // mapAttrs' (user: _:
+      nameValuePair "nemu-daemon-${user}" {
+        description = "Start nemu daemon for user ${user}";
+        serviceConfig = {
+          Type = "oneshot";
+          User = "${user}";
+          WorkingDirectory = "/home/${user}";
+          RemainAfterExit = "yes";
+          ExecStart = "${config.security.wrapperDir}/nemu --daemon";
+          # TODO Rework, pid may not be in /tmp/nemu-monitor.pid
+          ExecStop = "kill $(cat /tmp/nemu-monitor.pid)";
+        };
+        wantedBy = [ "nemu.target" ];
+      }
+    ) (filterAttrs (_: userOpts: userOpts.autoStartDaemon == true) cfg.users)
     // mapAttrs' (user: userOpts:
       nameValuePair "nemu-vm-${user}" {
         description = "Start nemu VMs for user ${user}";
@@ -181,6 +205,7 @@ in {
         after = [
           "network-online.target"
           "nemu-veth-${user}.service"
+          "nemu-daemon-${user}.service"
         ];
         wantedBy = [ "nemu-vm.target" ];
       }
