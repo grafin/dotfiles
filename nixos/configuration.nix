@@ -100,6 +100,14 @@
     pinentryFlavor = "gnome3";
   };
 
+  # Podman
+  virtualisation = {
+    podman = {
+      enable = true;
+      dockerCompat = true;
+    };
+  };
+
   # Users
   users.users.boris = {
     isNormalUser = true;
