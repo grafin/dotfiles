@@ -2,6 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
+    ccls
     codespell
     cppcheck
     file
@@ -15,6 +16,7 @@
     maestral
     nix-prefetch-git
     nnn
+    nodejs
     openjdk8
     p7zip
     ranger

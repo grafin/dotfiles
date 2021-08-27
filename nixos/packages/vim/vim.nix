@@ -8,7 +8,16 @@
       name = "vim";
       vimrcConfig.packages.myplugins = with pkgs.vimPlugins; {
         start = [
-          YouCompleteMe
+          coc-cmake
+          coc-css
+          coc-go
+          coc-html
+          coc-json
+          coc-nvim
+          coc-pyright
+          coc-python
+          coc-spell-checker
+          coc-yaml
           lightline-vim
           nerdtree
           nerdtree-git-plugin
@@ -39,6 +48,7 @@
 
         set number
         set colorcolumn=80,120
+        set signcolumn=yes
         highlight ColorColumn ctermbg=darkgray
         set noshowmode
         set laststatus=2
@@ -66,8 +76,6 @@
         let g:NERDTreeDirArrowCollapsible = ""
         let g:NERDTreeIgnore = ["__pycache__"]
 
-        let g:ycm_key_list_stop_completion = ["<C-y>", "<TAB>"]
-
         let g:easytags_async = 1
 
         autocmd FileType make set tabstop=4 softtabstop=0 shiftwidth=4 noexpandtab
@@ -77,20 +85,47 @@
         autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
         autocmd InsertLeave * match ExtraWhitespace /\s\+$/
 
+        " vim-coc configuration
+        " Use tab for trigger completion with characters ahead and navigate.
+        " Use command ':verbose imap <tab>' to make sure tab is not mapped by other plugin.
+        inoremap <silent><expr> <TAB>
+              \ pumvisible() ? "\<C-n>" :
+              \ <SID>check_back_space() ? "\<TAB>" :
+              \ coc#refresh()
+        inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+
+        function! s:check_back_space() abort
+          let col = col('.') - 1
+          return !col || getline('.')[col - 1]  =~# '\s'
+        endfunction
+
+        " Use <c-space> to trigger completion.
+        inoremap <silent><expr> <c-space> coc#refresh()
+
+        " Use <cr> to confirm completion, `<C-g>u` means break undo chain at current position.
+        " Coc only does snippet and additional edit on confirm.
+        inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+
         " Split navigation
         map <C-j> <C-W>j
         map <C-k> <C-W>k
         map <C-h> <C-W>h
         map <C-l> <C-W>l
 
+        " Use `[c` and `]c` to navigate diagnostics
+        nmap <silent> [c <Plug>(coc-diagnostic-prev)
+        nmap <silent> ]c <Plug>(coc-diagnostic-next)
+
         map <silent><expr> <F1> (&hls && v:hlsearch ? ":nohls" : ":set hls")."\n"
         map <silent> <F2> :NERDTreeToggle<CR>
         map <F3> <C-o>
         map <F4> <C-]>
-        map <F5> :YcmCompleter GoToInclude<CR>
-        map <F6> :YcmCompleter GoToDefinition<CR>
-        map <F7> :YcmCompleter GoToReferences<CR>
-        map <F8> :YcmCompleter GetType<CR>
+
+        nmap <silent> <F5> <Plug>(coc-implementation)
+        nmap <silent> <F6> <Plug>(coc-definition)
+        nmap <silent> <F7> <Plug>(coc-references)
+        nmap <silent> <F8> <Plug>(coc-type-definition)
+
         map <F9> :call flake8#Flake8()<CR>
         map <F10> :call flake8#Flake8ShowError()<CR>
         map <F11> :call flake8#Flake8UnplaceMarkers()<CR>
