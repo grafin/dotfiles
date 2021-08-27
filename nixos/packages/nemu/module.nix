@@ -178,13 +178,12 @@ in {
       nameValuePair "nemu-daemon-${user}" {
         description = "Start nemu daemon for user ${user}";
         serviceConfig = {
-          Type = "oneshot";
+          Type = "forking";
           User = "${user}";
           WorkingDirectory = "/home/${user}";
-          RemainAfterExit = "yes";
           ExecStart = "${config.security.wrapperDir}/nemu --daemon";
           # TODO Rework, pid may not be in /tmp/nemu-monitor.pid
-          ExecStop = "kill $(cat /tmp/nemu-monitor.pid)";
+          # ExecStop = "kill $(cat /tmp/nemu-monitor.pid)";
         };
         wantedBy = [ "nemu.target" ];
       }
