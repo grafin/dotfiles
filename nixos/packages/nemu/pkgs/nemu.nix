@@ -40,8 +40,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "nemuTUI";
     repo = "nemu";
-    rev = "9d32b57fccf379b45f70d8c8a3baa0bbe7d7fe45";
-    sha256 = "1332ppylnil0q8kv72riv515jp05q9vkws3awihlzjg4kcchkg64";
+    rev = "ebf991b8a2c74c51843b64c7b7bf3062bf17b288";
+    sha256 = "08rwaf1f1k5yqfxk3yrl1i7ycgv0m4jnf7a78xi9r905k7ylrfgk";
   };
 
   system.requiredKernelConfig = with config.lib.kernelConfig; [
