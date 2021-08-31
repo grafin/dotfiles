@@ -6,7 +6,6 @@ let
   nemu = nixpkgs.callPackage ./pkgs/nemu.nix {
     withDbus = true;
     withNetworkMap = true;
-    withUnicodeGlyphs = true;
     withRemote = true;
   };
 in {
