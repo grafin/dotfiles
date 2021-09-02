@@ -3,8 +3,8 @@
 {
   networking.firewall = {
     allowedTCPPorts = [
-      445
       139
+      445
     ];
     allowedUDPPorts = [
       137
@@ -29,5 +29,13 @@
         "guest ok" = "no";
       };
     };
+  };
+
+  environment.systemPackages = with pkgs; [
+    x2goserver
+  ];
+
+  services.x2goserver = {
+    enable = true;
   };
 }

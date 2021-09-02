@@ -13,7 +13,7 @@
       ./i3.nix
       ./packages/default.nix
       ./packages/gui/default.nix
-      ./samba.nix
+      ./remote.nix
       ./secret.nix
     ];
 
