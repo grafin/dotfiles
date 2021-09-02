@@ -127,6 +127,7 @@
     "skypeforlinux"
     "sublime-merge"
     "sublimetext4"
+    "unityhub"
     "yEd"
     "zoom"
   ];

@@ -39,6 +39,7 @@
     tigervnc
     transmission
     tridactyl-native
+    unityhub
     virtviewer
     vlc
     wireshark
