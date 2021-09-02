@@ -181,9 +181,8 @@ in {
           Type = "forking";
           User = "${user}";
           WorkingDirectory = "/home/${user}";
+          Environment = "\"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus\"";
           ExecStart = "${config.security.wrapperDir}/nemu --daemon";
-          # TODO Rework, pid may not be in /tmp/nemu-monitor.pid
-          # ExecStop = "kill $(cat /tmp/nemu-monitor.pid)";
         };
         wantedBy = [ "nemu.target" ];
       }
