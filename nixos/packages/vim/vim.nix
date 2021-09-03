@@ -28,6 +28,7 @@
           vim-lastplace
           vim-nix
           vim-obsession
+          vim-polyglot
           vim-prosession
           vim-signify
           vim-tmux-focus-events
