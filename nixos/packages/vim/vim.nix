@@ -4,39 +4,40 @@
   environment.variables = { EDITOR = "vim"; };
 
   environment.systemPackages = with pkgs; [
-    ((vim_configurable.override { python = python3; }).customize{
-      name = "vim";
-      vimrcConfig.packages.myplugins = with pkgs.vimPlugins; {
-        start = [
-          coc-cmake
-          coc-css
-          coc-go
-          coc-html
-          coc-json
-          coc-nvim
-          coc-pyright
-          coc-python
-          coc-spell-checker
-          coc-yaml
-          lightline-vim
-          nerdtree
-          nerdtree-git-plugin
-          papercolor-theme
-          vim-easytags
-          vim-flake8
-          vim-fugitive
-          vim-lastplace
-          vim-nix
-          vim-obsession
-          vim-polyglot
-          vim-prosession
-          vim-signify
-          vim-tmux-focus-events
-          vim-tmux-navigator
-        ];
-        opt = [];
-      };
-      vimrcConfig.customRC = ''
+    (neovim.override {
+      vimAlias = true;
+      configure = {
+        packages.myPlugins = with pkgs.vimPlugins; {
+          start = [
+            coc-cmake
+            coc-css
+            coc-go
+            coc-html
+            coc-json
+            coc-nvim
+            coc-pyright
+            coc-python
+            coc-spell-checker
+            coc-yaml
+            lightline-vim
+            nerdtree
+            nerdtree-git-plugin
+            papercolor-theme
+            vim-easytags
+            vim-flake8
+            vim-fugitive
+            vim-lastplace
+            vim-nix
+            vim-obsession
+            vim-polyglot
+            vim-prosession
+            vim-signify
+            vim-tmux-focus-events
+            vim-tmux-navigator
+          ];
+          opt = [];
+        };
+      customRC = ''
         set nocompatible
         filetype off
 
@@ -132,6 +133,6 @@
         map <F11> :call flake8#Flake8UnplaceMarkers()<CR>
         set pastetoggle=<F12>
       '';
-    }
-  )];
+    };
+  })];
 }
