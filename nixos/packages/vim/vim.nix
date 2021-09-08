@@ -1,6 +1,18 @@
 { config, pkgs, ... }:
 
-{
+let
+  omnisharp-vim = pkgs.vimUtils.buildVimPluginFrom2Nix {
+    pname = "omnisharp-vim";
+    version = "unstable-2021-08-30";
+    src = pkgs.fetchFromGitHub {
+      owner = "OmniSharp";
+      repo = "omnisharp-vim";
+      rev = "ab6348c61211fb88bad19a1e89ee65ec3243f0b7";
+      sha256 = "154wy256g8gnhsh924ihs1bysl9flm0snpigrn31b2hg9nqiw2hn";
+    };
+    meta.homepage = "https://github.com/OmniSharp/omnisharp-vim";
+  };
+in {
   environment.variables = { EDITOR = "vim"; };
 
   environment.systemPackages = with pkgs; [
@@ -22,6 +34,7 @@
             lightline-vim
             nerdtree
             nerdtree-git-plugin
+            omnisharp-vim
             papercolor-theme
             vim-easytags
             vim-flake8
@@ -80,6 +93,10 @@
 
         let g:easytags_async = 1
 
+        let g:OmniSharp_server_path = "${omnisharp-roslyn}/src/OmniSharp.exe"
+        let g:OmniSharp_log_dir = $HOME."/.local/share/omnisharp/log"
+        let g:OmniSharp_server_use_mono = 1
+
         autocmd FileType make set tabstop=4 softtabstop=0 shiftwidth=4 noexpandtab
         autocmd FileType cmake set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 
@@ -134,5 +151,9 @@
         set pastetoggle=<F12>
       '';
     };
-  })];
+  })
+  mono
+  neovim-remote
+  omnisharp-roslyn
+  ];
 }
