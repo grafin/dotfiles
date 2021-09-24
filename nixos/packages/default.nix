@@ -6,6 +6,7 @@
     codespell
     cppcheck
     file
+    ffmpeg
     gdb
     gitFull
     gnupg
