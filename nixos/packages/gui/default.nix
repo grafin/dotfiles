@@ -39,6 +39,7 @@
     unityhub
     virtviewer
     vlc
+    wineWowPackages.full
     wireshark
     xdg-launch
     xdg-utils
