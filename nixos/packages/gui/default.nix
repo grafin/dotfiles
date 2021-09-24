@@ -2,6 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
+    android-file-transfer
     android-studio
     audacity
     blender
