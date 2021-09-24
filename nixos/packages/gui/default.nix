@@ -10,11 +10,6 @@
     deadbeef
     discord
     evince
-    (firefox.override {
-      cfg = {
-        enableTridactylNative = true;
-      };
-    })
     flameshot
     geogebra
     gimp
@@ -52,6 +47,7 @@
   ];
 
   imports = [
+    ./firefox/firefox.nix
     ./jitsi/jitsi.nix
   ];
 }
