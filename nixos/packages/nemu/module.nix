@@ -107,6 +107,8 @@ in {
 
     # Set capabilities
     security.wrappers.nemu = {
+      owner = "root";
+      group = "root";
       source = "${cfg.package}/bin/nemu";
       capabilities = "cap_net_admin+ep";
     };
@@ -175,15 +177,30 @@ in {
       }
     ) (filterAttrs (_: userOpts: userOpts.autoAddVeth == true) cfg.users)
     // mapAttrs' (user: _:
+      nameValuePair "nemu-uid-${user}" {
+        description = "Get UID for ${user} for nemu daemon";
+        serviceConfig = {
+          Type = "oneshot";
+          User = "${user}";
+          ExecStart = ''
+            /bin/sh -c \
+            "${pkgs.coreutils}/bin/echo DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID/bus > /tmp/nemu-daemon-${user}.env"
+          '';
+        };
+        wantedBy = [ "nemu.target" ];
+      }
+    ) (filterAttrs (_: userOpts: userOpts.autoAddVeth == true) cfg.users)
+    // mapAttrs' (user: _:
       nameValuePair "nemu-daemon-${user}" {
         description = "Start nemu daemon for user ${user}";
         serviceConfig = {
           Type = "forking";
           User = "${user}";
           WorkingDirectory = "/home/${user}";
-          Environment = "\"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus\"";
+          EnvironmentFile = "/tmp/nemu-daemon-${user}.env";
           ExecStart = "${config.security.wrapperDir}/nemu --daemon";
         };
+        after = [ "nemu-uid-${user}" ];
         wantedBy = [ "nemu.target" ];
       }
     ) (filterAttrs (_: userOpts: userOpts.autoStartDaemon == true) cfg.users)
