@@ -124,6 +124,7 @@
     "cnijfilter2"
     "discord"
     "geogebra"
+    "reaper"
     "skypeforlinux"
     "sublime-merge"
     "sublimetext4"
