@@ -13,6 +13,7 @@
       ./i3.nix
       ./packages/default.nix
       ./packages/gui/default.nix
+      ./packages/audio/default.nix
       ./remote.nix
       ./secret.nix
     ];
@@ -114,6 +115,7 @@
     home = "/home/boris";
     description = "Stepanenko Boris";
     extraGroups = [
+      "audio"
       "wheel"
     ];
   };
@@ -136,6 +138,14 @@
     home-manager
   ];
   nix.autoOptimiseStore = true;
+
+  # Audio limits
+  security.pam.loginLimits = [
+    { domain = "@audio"; item = "memlock"; type = "-"   ; value = "unlimited"; }
+    { domain = "@audio"; item = "nofile" ; type = "hard"; value = "99999"    ; }
+    { domain = "@audio"; item = "nofile" ; type = "soft"; value = "99999"    ; }
+    { domain = "@audio"; item = "rtprio" ; type = "-"   ; value = "99"       ; }
+  ];
 
   # Man
   documentation.dev.enable = true;

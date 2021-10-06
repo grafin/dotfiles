@@ -23,7 +23,6 @@
     pavucontrol
     qalculate-gtk
     qucs
-    reaper
     remmina
     screenkey
     shotcut

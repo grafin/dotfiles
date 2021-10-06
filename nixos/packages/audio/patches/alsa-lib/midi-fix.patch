@@ -1,0 +1,34 @@
+diff -ru alsa-lib-1.2.5/include/sound/uapi/asound.h alsa-lib-1.2.5_patched/include/sound/uapi/asound.h
+--- alsa-lib-1.2.5/include/sound/uapi/asound.h	2021-05-27 23:30:16.000000000 +0200
++++ alsa-lib-1.2.5_patched/include/sound/uapi/asound.h	2021-09-19 21:49:41.973912234 +0200
+@@ -733,6 +733,7 @@
+ 	size_t buffer_size;		/* queue size in bytes */
+ 	size_t avail_min;		/* minimum avail bytes for wakeup */
+ 	unsigned int no_active_sensing: 1; /* do not send active sensing byte in close() */
++	unsigned int mode;		/* For input data only, frame incoming data */	
+ 	unsigned char reserved[16];	/* reserved for future use */
+ };
+ 
+diff -ru alsa-lib-1.2.5/src/rawmidi/rawmidi.c alsa-lib-1.2.5_patched/src/rawmidi/rawmidi.c
+--- alsa-lib-1.2.5/src/rawmidi/rawmidi.c	2021-05-27 23:30:16.000000000 +0200
++++ alsa-lib-1.2.5_patched/src/rawmidi/rawmidi.c	2021-09-19 21:15:28.059054399 +0200
+@@ -154,6 +154,8 @@
+ 	params->buffer_size = page_size();
+ 	params->avail_min = 1;
+ 	params->no_active_sensing = 1;
++	params->mode = 0;
++	memset(params->reserved, 0, sizeof(params->reserved));
+ 	return 0;
+ }
+ 
+diff -ru alsa-lib-1.2.5/src/rawmidi/rawmidi_local.h alsa-lib-1.2.5_patched/src/rawmidi/rawmidi_local.h
+--- alsa-lib-1.2.5/src/rawmidi/rawmidi_local.h	2021-05-27 23:30:16.000000000 +0200
++++ alsa-lib-1.2.5_patched/src/rawmidi/rawmidi_local.h	2021-09-19 21:18:41.925960003 +0200
+@@ -48,6 +48,7 @@
+ 	size_t buffer_size;
+ 	size_t avail_min;
+ 	unsigned int no_active_sensing: 1;
++	int params_mode;
+ };
+ 
+ int snd_rawmidi_hw_open(snd_rawmidi_t **input, snd_rawmidi_t **output,
