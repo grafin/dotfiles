@@ -1,0 +1,3 @@
+R_LIBS="~/dev/R/Library"
+R_LIBS_USER="~/dev/R/Library"
+RSTUDIO_PANDOC="/run/current-system/sw/bin"
