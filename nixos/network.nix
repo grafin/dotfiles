@@ -5,8 +5,11 @@
     hostName = "mainhost";
     useDHCP = false;
 
-    bridges.br0.interfaces = [ "enp3s0" "veth_br0_0" ];
-    interfaces.br0.useDHCP = true;
+    bridges.br0.interfaces = [ "enp3s0" "enp5s0" "veth_br0_0" ];
+    interfaces.br0 = {
+      useDHCP = true;
+      macAddress = "DE:AD:BE:EF:FF:FF";
+    };
 
     interfaces.veth_ll_0.ipv4.addresses = [
       {
