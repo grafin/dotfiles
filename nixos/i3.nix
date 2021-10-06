@@ -9,6 +9,23 @@
   services.xserver = {
     enable = true;
 
+    xrandrHeads = [
+      {
+        output = "DP-2";
+        monitorConfig = ''
+          Option "LeftOf" "HDMI-2"
+          Option "PreferredMode" "1920x1080"
+        '';
+      }
+      {
+        output = "HDMI-2";
+        primary = true;
+        monitorConfig = ''
+          Option "PreferredMode" "1920x1080"
+        '';
+      }
+    ];
+
     desktopManager = {
       xterm.enable = false;
     };

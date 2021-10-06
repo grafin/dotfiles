@@ -4,7 +4,10 @@
 pkill --signal QUIT polybar
 
 # Launch top bar
-echo "---" | tee -a /tmp/polybar-top.log
-polybar top 2>&1 | tee -a /tmp/polybar-top.log & disown
+echo "---" | tee -a /tmp/polybar-top-right.log
+echo "---" | tee -a /tmp/polybar-top-left.log
+
+polybar top -c ~/.config/polybar/config-right 2>&1 | tee -a /tmp/polybar-top-right.log & disown
+polybar top -c ~/.config/polybar/config-left 2>&1 | tee -a /tmp/polybar-top-left.log & disown
 
 echo "Bars launched..."

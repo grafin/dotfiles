@@ -1,0 +1,62 @@
+[colors]
+bg = #2F343F
+inactive-bg = #2F343F
+text = #F3F4F5
+inactive-text = #676E7D
+urgent-bg = #E53935
+
+[bar/top]
+ienable-ipc = true
+;override-redirect = true
+;wm-restack = i3
+monitor = DP-2
+background = ${colors.bg}
+
+font-0 = "Open Sans:style=Regular:pixelsize=10;0"
+font-1 = "Font Awesome 5 Free,Font Awesome 5 Free Regular:style=Regular:pixelsize=10;0"
+font-2 = "Font Awesome 5 Brands,Font Awesome 5 Brands Regular:style=Regular:pixelsize=10;0"
+font-3 = "Font Awesome 5 Free,Font Awesome 5 Free Solid:style=Solid:pixelsize=10;0"
+
+tray-position = right
+tray-detached = false
+
+module-margin = 2
+modules-left = i3 title
+
+[module/i3]
+type = internal/i3
+pin-workspaces = true
+strip-wsnumbers = true
+index-sort = true
+enable-click = true
+enable-scroll = true
+wrapping-scroll = false
+reverse-scroll = false
+fuzzy-match = true
+
+label-separator = |
+label-separator-foreground = ${colors.inactive-text}
+
+label-focused = %{F#F3F4F5}%{T4}%icon%
+label-focused-padding = 1
+label-unfocused = %{F#676E7D}%{T4}%icon%
+label-unfocused-padding = 1
+label-urgent = %{F#676E7D}%{T4}%icon%
+label-urgent-padding = 1
+label-urgent-background = ${colors.urgent-bg}
+
+ws-icon-default = 
+ws-icon-0 = tty;
+ws-icon-1 = mail;
+ws-icon-2 = web;%{T3}
+ws-icon-3 = files;
+ws-icon-4 = sublime_text;
+ws-icon-5 = sublime_merge;
+ws-icon-6 = telegram;%{T3}
+ws-icon-7 = jitsi;
+ws-icon-8 = windows;%{T3}
+ws-icon-9 = music;
+
+[module/title]
+type = internal/xwindow
+label-maxlen = 50

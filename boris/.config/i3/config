@@ -70,6 +70,12 @@ bindsym $mod+Down focus down
 bindsym $mod+Up focus up
 bindsym $mod+Right focus right
 
+# move workspace between monitors
+bindsym $mod+Control+h move workspace to output left
+bindsym $mod+Control+l move workspace to output right
+bindsym $mod+Control+Left move workspace to output left
+bindsym $mod+Control+Right move workspace to output right
+
 # move focused window
 bindsym $mod+Shift+h move left
 bindsym $mod+Shift+j move down
@@ -125,6 +131,18 @@ set $ws9 "9:windows"
 set $ws10 "10:music"
 set $ws11 "11:1"
 set $ws12 "12:2"
+set $ws13 "13:1"
+set $ws14 "14:2"
+set $ws15 "15:2"
+set $ws16 "16:2"
+set $ws17 "17:2"
+set $ws18 "18:2"
+set $ws19 "19:2"
+set $ws20 "20:2"
+set $ws21 "21:2"
+set $ws22 "22:2"
+set $ws23 "23:2"
+set $ws24 "24:2"
 
 # Autostart GUI apps
 exec i3-msg 'workspace $ws1; exec $term'
@@ -150,6 +168,32 @@ assign [class="MellowPlayer"]       $ws10
 # Assign floating windows
 for_window [class="Qalculate-gtk"] floating enable
 
+# Assign workspaces to monitors
+workspace 1 output HDMI-2
+workspace 2 output HDMI-2
+workspace 3 output HDMI-2
+workspace 4 output HDMI-2
+workspace 5 output HDMI-2
+workspace 6 output HDMI-2
+workspace 7 output HDMI-2
+workspace 8 output HDMI-2
+workspace 9 output HDMI-2
+workspace 10 output HDMI-2
+workspace 11 output HDMI-2
+workspace 12 output HDMI-2
+workspace 13 output DP-2
+workspace 14 output DP-2
+workspace 15 output DP-2
+workspace 16 output DP-2
+workspace 17 output DP-2
+workspace 18 output DP-2
+workspace 19 output DP-2
+workspace 20 output DP-2
+workspace 21 output DP-2
+workspace 22 output DP-2
+workspace 23 output DP-2
+workspace 24 output DP-2
+
 # switch to workspace
 bindsym $mod+1 workspace number $ws1
 bindsym $mod+2 workspace number $ws2
@@ -163,6 +207,18 @@ bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 bindsym $mod+minus workspace number $ws11
 bindsym $mod+equal workspace number $ws12
+bindsym $mod+Control+1 workspace number $ws13
+bindsym $mod+Control+2 workspace number $ws14
+bindsym $mod+Control+3 workspace number $ws15
+bindsym $mod+Control+4 workspace number $ws16
+bindsym $mod+Control+5 workspace number $ws17
+bindsym $mod+Control+6 workspace number $ws18
+bindsym $mod+Control+7 workspace number $ws19
+bindsym $mod+Control+8 workspace number $ws20
+bindsym $mod+Control+9 workspace number $ws21
+bindsym $mod+Control+0 workspace number $ws22
+bindsym $mod+Control+minus workspace number $ws23
+bindsym $mod+Control+equal workspace number $ws24
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace number $ws1
@@ -177,6 +233,18 @@ bindsym $mod+Shift+9 move container to workspace number $ws9
 bindsym $mod+Shift+0 move container to workspace number $ws10
 bindsym $mod+Shift+minus move container to workspace number $ws11
 bindsym $mod+Shift+equal move container to workspace number $ws12
+bindsym $mod+Control+Shift+1 move container to workspace number $ws13
+bindsym $mod+Control+Shift+2 move container to workspace number $ws14
+bindsym $mod+Control+Shift+3 move container to workspace number $ws15
+bindsym $mod+Control+Shift+4 move container to workspace number $ws16
+bindsym $mod+Control+Shift+5 move container to workspace number $ws17
+bindsym $mod+Control+Shift+6 move container to workspace number $ws18
+bindsym $mod+Control+Shift+7 move container to workspace number $ws19
+bindsym $mod+Control+Shift+8 move container to workspace number $ws20
+bindsym $mod+Control+Shift+9 move container to workspace number $ws21
+bindsym $mod+Control+Shift+0 move container to workspace number $ws22
+bindsym $mod+Control+Shift+minus move container to workspace number $ws23
+bindsym $mod+Control+Shift+equal move container to workspace number $ws24
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
