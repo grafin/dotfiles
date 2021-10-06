@@ -20,6 +20,7 @@
     nodejs
     openjdk8
     p7zip
+    pandoc
     ranger
     tree
     udiskie

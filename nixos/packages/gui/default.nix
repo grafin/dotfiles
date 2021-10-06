@@ -51,5 +51,6 @@
   imports = [
     ./firefox/firefox.nix
     ./jitsi/jitsi.nix
+    ./R/R.nix
   ];
 }
