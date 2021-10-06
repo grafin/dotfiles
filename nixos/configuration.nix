@@ -126,6 +126,7 @@
     "cnijfilter2"
     "discord"
     "geogebra"
+    "hunspell-dict-nl-nl"
     "reaper"
     "skypeforlinux"
     "sublime-merge"
