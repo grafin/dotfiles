@@ -1,4 +1,7 @@
 {
+  "python.jediEnabled": true,
+  "python.jediPath": "/var/run/current-system/sw/lib/python3.9/site-packages",
+
   "languageserver": {
     "ccls": {
       "command": "ccls",
