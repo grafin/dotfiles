@@ -25,7 +25,7 @@
     qucs
     remmina
     screenkey
-    #shotcut
+    shotcut
     skype
     sublime-merge
     sublime4
