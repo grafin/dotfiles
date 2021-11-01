@@ -30,6 +30,7 @@
     sublime-merge
     sublime4
     tdesktop
+    teams
     texlive.combined.scheme-full
     texstudio
     thunderbird

@@ -131,6 +131,7 @@
     "skypeforlinux"
     "sublime-merge"
     "sublimetext4"
+    "teams"
     "unityhub"
     "yEd"
     "zoom"
