@@ -56,7 +56,7 @@
     logind.extraConfig = ''
       HandlePowerKey=suspend
       IdleAction=suspend
-      IdleActionSec=30min
+      IdleActionSec=60min
     '';
     openssh = {
       enable = true;

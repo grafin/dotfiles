@@ -50,7 +50,7 @@
     xautolock = {
       enable = true;
       enableNotifier = true;
-      time = 15;
+      time = 30;
       locker = ''${pkgs.i3lock-fancy-rapid}/bin/i3lock-fancy-rapid 8 pixel'';
       notify = 10;
       notifier =
