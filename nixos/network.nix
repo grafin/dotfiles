@@ -76,14 +76,14 @@
         ips = [ "172.16.0.2/24" ];
         listenPort = 55777;
 
-        privateKeyFile = "/root/wireguard/private-mainhost.key";
+        privateKeyFile = "/root/wireguard/mainhost";
 
         peers = [
           {
-            publicKey = "xWmKFQiiAKLP7mE1+grvLWUqHDgchOlR/4YhtV+mgAg=";
+            publicKey = "JKiITZg+TFXooIVsoU48U9EOehZMigMwXihlMx/BAzI=";
+            presharedKeyFile = "/root/wireguard/mainhost.preshared";
             allowedIPs = [ "172.16.0.0/24" ];
-            endpoint = "142.47.104.94:55777";
-            persistentKeepalive = 25;
+            endpoint = "46.39.239.57:55777";
           }
         ];
       };
