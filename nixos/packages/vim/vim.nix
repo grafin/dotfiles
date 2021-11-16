@@ -29,6 +29,7 @@ in {
             coc-nvim
             coc-pyright
             coc-python
+            coc-snippets
             coc-spell-checker
             coc-yaml
             lightline-vim
@@ -45,6 +46,7 @@ in {
             vim-polyglot
             vim-prosession
             vim-signify
+            vim-snippets
             vim-tmux-focus-events
             vim-tmux-navigator
           ];
