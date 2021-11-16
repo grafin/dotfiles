@@ -41,13 +41,19 @@
     virtviewer
     vlc
     wineWowPackages.full
-    wireshark
     xdg-launch
     xdg-utils
     xournalpp
     yed
     zoom-us
   ];
+
+  programs = {
+    wireshark = {
+      enable = true;
+      package = pkgs.wireshark-qt;
+    };
+  };
 
   imports = [
     ./firefox/firefox.nix

@@ -55,7 +55,7 @@
   services = {
     logind.extraConfig = ''
       HandlePowerKey=suspend
-      IdleAction=suspend
+      IdleAction=ignore
       IdleActionSec=60min
     '';
     openssh = {
@@ -117,6 +117,7 @@
     extraGroups = [
       "audio"
       "wheel"
+      "wireshark"
     ];
   };
 
