@@ -8,6 +8,7 @@
     file
     ffmpeg
     gdb
+    gh
     gitFull
     gnupg
     haskellPackages.update-nix-fetchgit
