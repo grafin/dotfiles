@@ -88,9 +88,6 @@
     ];
   };
 
-  environment.systemPackages = with pkgs; [
-    home-manager
-  ];
   nix.settings.auto-optimise-store = true;
 
   # Man
