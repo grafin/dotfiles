@@ -14,6 +14,7 @@
       ./packages/default.nix
       ./packages/gui/default.nix
       ./packages/audio/default.nix
+      ./www.nix
       ./remote.nix
       ./secret.nix
     ];
