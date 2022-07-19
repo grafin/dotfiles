@@ -64,6 +64,36 @@ function print_nix_shell {
     fi
 }
 
+function __transfer {
+    if [ $# -eq 0 ]; then
+        echo "No arguments specified.\nUsage:\n  transfer <file|directory>\n  ... | transfer <file_name>">&2
+        return 1
+    fi
+    local url="$1"
+    if tty -s; then
+        local file="$2"
+        local file_name=$(basename "$file")
+        if [ ! -e "$file" ]; then
+            echo "$file: No such file or directory">&2
+            return 1
+        fi
+        if [ -d "$file" ]; then
+            local file_name="$file_name.zip"
+            (pushd "${file}" && zip -r -q - .) |\
+                curl -w "\n" --progress-bar --upload-file "-" "${url}/$file_name" |\
+                tee /dev/null
+        else
+            cat "$file" |\
+                curl -w "\n" --progress-bar --upload-file "-" "${url}/$file_name" |\
+                tee /dev/null
+        fi
+    else
+        local file_name=$1
+        curl -w "\n" --progress-bar --upload-file "-" "${url}/$file_name" |\
+        tee /dev/null
+    fi
+}
+
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=
 
@@ -88,3 +118,7 @@ alias ssh='TERM=xterm-256color ssh'
 
 # rsync
 alias cpv='rsync -vhae ssh --progress'
+
+# transfer
+alias transfer='__transfer "https://transfer.sh"'
+alias transfer_bk='__transfer "https://t.bk.ru"'
