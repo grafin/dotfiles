@@ -8,10 +8,9 @@
   imports = [
       ./hardware-configuration.nix
       ./network.nix
-      ./packages/default.nix
       ./www.nix
       ./remote.nix
-      ./secret.nix
+      ./packages/default.nix
     ];
 
   # Use systemd-boot EFI boot loader.
@@ -33,7 +32,7 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "20.09"; # Did you read the comment?
+  system.stateVersion = "22.05"; # Did you read the comment?
 
   # Services
   services = {
@@ -41,7 +40,7 @@
       enable = true;
       forwardX11 = true;
       passwordAuthentication = false;
-      challengeResponseAuthentication = false;
+      kbdInteractiveAuthentication = false;
     };
     fail2ban.enable = true;
   };
@@ -92,7 +91,7 @@
   environment.systemPackages = with pkgs; [
     home-manager
   ];
-  nix.autoOptimiseStore = true;
+  nix.settings.auto-optimise-store = true;
 
   # Man
   documentation.dev.enable = true;
