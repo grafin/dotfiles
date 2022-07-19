@@ -1,0 +1,5563 @@
+diff --git a/Makefile.in b/Makefile.in
+index 0e31db37..8afab557 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -85,6 +85,8 @@ LIBNETDISSECT_SRC=\
+ 	ipproto.c \
+ 	l2vpn.c \
+ 	machdep.c \
++	msgpuck.c \
++	msgpuck_hints.c \
+ 	netdissect.c \
+ 	netdissect-alloc.c \
+ 	nlpid.c \
+@@ -228,6 +230,7 @@ LIBNETDISSECT_SRC=\
+ 	print-sunrpc.c \
+ 	print-symantec.c \
+ 	print-syslog.c \
++	print-tarantool.c \
+ 	print-tcp.c \
+ 	print-telnet.c \
+ 	print-tftp.c \
+diff --git a/msgpuck.c b/msgpuck.c
+new file mode 100644
+index 00000000..7e9eba8a
+--- /dev/null
++++ b/msgpuck.c
+@@ -0,0 +1,446 @@
++/*
++ * Copyright (c) 2021 The TCPDUMP project
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ * Initial contribution by Pavel Balaev (balaev@tarantool.org).
++ */
++
++/*
++ * Copyright (c) 2013-2017 MsgPuck Authors
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or
++ * without modification, are permitted provided that the following
++ * conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above
++ *    copyright notice, this list of conditions and the
++ *    following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above
++ *    copyright notice, this list of conditions and the following
++ *    disclaimer in the documentation and/or other materials
++ *    provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
++ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
++ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#define MP_LIBRARY 1
++#include "msgpuck.h"
++
++int
++mp_fprint_ext_default(FILE *file, const char **data, int depth)
++{
++	(void) depth;
++	int8_t type;
++	uint32_t len;
++	mp_decode_ext(data, &type, &len);
++	return fprintf(file, "(extension: type %d, len %u)", (int)type,
++		      (unsigned)len);
++}
++
++int
++mp_snprint_ext_default(char *buf, int size, const char **data, int depth)
++{
++	(void) depth;
++	int8_t type;
++	uint32_t len;
++	mp_decode_ext(data, &type, &len);
++	return snprintf(buf, size, "(extension: type %d, len %u)", (int)type,
++			(unsigned)len);
++}
++
++mp_fprint_ext_f mp_fprint_ext = mp_fprint_ext_default;
++
++mp_snprint_ext_f mp_snprint_ext = mp_snprint_ext_default;
++
++size_t
++mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
++{
++	size_t result = 0;
++	const char *f = NULL;
++
++	for (f = format; *f; f++) {
++		if (f[0] == '[') {
++			uint32_t size = 0;
++			int level = 1;
++			const char *e = NULL;
++
++			for (e = f + 1; level && *e; e++) {
++				if (*e == '[' || *e == '{') {
++					if (level == 1)
++						size++;
++					level++;
++				} else if (*e == ']' || *e == '}') {
++					level--;
++					/* opened '[' must be closed by ']' */
++					assert(level || *e == ']');
++				} else if (*e == '%') {
++					if (e[1] == '%')
++						e++;
++					else if (level == 1)
++						size++;
++				} else if (*e == 'N' && e[1] == 'I'
++					   && e[2] == 'L' && level == 1) {
++					size++;
++				}
++			}
++			/* opened '[' must be closed */
++			assert(level == 0);
++			result += mp_sizeof_array(size);
++			if (result <= data_size)
++				data = mp_encode_array(data, size);
++		} else if (f[0] == '{') {
++			uint32_t count = 0;
++			int level = 1;
++			const char *e = NULL;
++
++			for (e = f + 1; level && *e; e++) {
++				if (*e == '[' || *e == '{') {
++					if (level == 1)
++						count++;
++					level++;
++				} else if (*e == ']' || *e == '}') {
++					level--;
++					/* opened '{' must be closed by '}' */
++					assert(level || *e == '}');
++				} else if (*e == '%') {
++					if (e[1] == '%')
++						e++;
++					else if (level == 1)
++						count++;
++				} else if (*e == 'N' && e[1] == 'I'
++					   && e[2] == 'L' && level == 1) {
++					count++;
++				}
++			}
++			/* opened '{' must be closed */
++			assert(level == 0);
++			/* since map is a pair list, count must be even */
++			assert(count % 2 == 0);
++			uint32_t size = count / 2;
++			result += mp_sizeof_map(size);
++			if (result <= data_size)
++				data = mp_encode_map(data, size);
++		} else if (f[0] == '%') {
++			f++;
++			assert(f[0]);
++			int64_t int_value = 0;
++			int int_status = 0; /* 1 - signed, 2 - unsigned */
++
++			if (f[0] == 'd' || f[0] == 'i') {
++				int_value = va_arg(vl, int);
++				int_status = 1;
++			} else if (f[0] == 'u') {
++				int_value = va_arg(vl, unsigned int);
++				int_status = 2;
++			} else if (f[0] == 's') {
++				const char *str = va_arg(vl, const char *);
++				uint32_t len = (uint32_t)strlen(str);
++				result += mp_sizeof_str(len);
++				if (result <= data_size)
++					data = mp_encode_str(data, str, len);
++			} else if (f[0] == '.' && f[1] == '*' && f[2] == 's') {
++				uint32_t len = va_arg(vl, uint32_t);
++				const char *str = va_arg(vl, const char *);
++				result += mp_sizeof_str(len);
++				if (result <= data_size)
++					data = mp_encode_str(data, str, len);
++				f += 2;
++			} else if (f[0] == 'p') {
++				const char *p = va_arg(vl, const char *);
++				const char *end = p;
++				mp_next(&end);
++				uint32_t len = (uint32_t)(end - p);
++				result += len;
++				if (result <= data_size) {
++					memcpy(data, p, len);
++					data += len;
++				}
++			} else if (f[0] == '.' && f[1] == '*' && f[2] == 'p') {
++				uint32_t len = va_arg(vl, uint32_t);
++				const char *p = va_arg(vl, const char *);
++				assert(len > 0);
++				result += len;
++				if (result <= data_size) {
++					memcpy(data, p, len);
++					data += len;
++				}
++				f += 2;
++			} else if(f[0] == 'f') {
++				float v = (float)va_arg(vl, double);
++				result += mp_sizeof_float(v);
++				if (result <= data_size)
++					data = mp_encode_float(data, v);
++			} else if(f[0] == 'l' && f[1] == 'f') {
++				double v = va_arg(vl, double);
++				result += mp_sizeof_double(v);
++				if (result <= data_size)
++					data = mp_encode_double(data, v);
++				f++;
++			} else if(f[0] == 'b') {
++				bool v = (bool)va_arg(vl, int);
++				result += mp_sizeof_bool(v);
++				if (result <= data_size)
++					data = mp_encode_bool(data, v);
++			} else if (f[0] == 'l'
++				   && (f[1] == 'd' || f[1] == 'i')) {
++				int_value = va_arg(vl, long);
++				int_status = 1;
++				f++;
++			} else if (f[0] == 'l' && f[1] == 'u') {
++				int_value = va_arg(vl, unsigned long);
++				int_status = 2;
++				f++;
++			} else if (f[0] == 'l' && f[1] == 'l'
++				   && (f[2] == 'd' || f[2] == 'i')) {
++				int_value = va_arg(vl, long long);
++				int_status = 1;
++				f += 2;
++			} else if (f[0] == 'l' && f[1] == 'l' && f[2] == 'u') {
++				int_value = va_arg(vl, unsigned long long);
++				int_status = 2;
++				f += 2;
++			} else if (f[0] == 'h'
++				   && (f[1] == 'd' || f[1] == 'i')) {
++				int_value = va_arg(vl, int);
++				int_status = 1;
++				f++;
++			} else if (f[0] == 'h' && f[1] == 'u') {
++				int_value = va_arg(vl, unsigned int);
++				int_status = 2;
++				f++;
++			} else if (f[0] == 'h' && f[1] == 'h'
++				   && (f[2] == 'd' || f[2] == 'i')) {
++				int_value = va_arg(vl, int);
++				int_status = 1;
++				f += 2;
++			} else if (f[0] == 'h' && f[1] == 'h' && f[2] == 'u') {
++				int_value = va_arg(vl, unsigned int);
++				int_status = 2;
++				f += 2;
++			} else if (f[0] != '%') {
++				/* unexpected format specifier */
++				assert(false);
++			}
++
++			if (int_status == 1 && int_value < 0) {
++				result += mp_sizeof_int(int_value);
++				if (result <= data_size)
++					data = mp_encode_int(data, int_value);
++			} else if(int_status) {
++				result += mp_sizeof_uint(int_value);
++				if (result <= data_size)
++					data = mp_encode_uint(data, int_value);
++			}
++		} else if (f[0] == 'N' && f[1] == 'I' && f[2] == 'L') {
++			result += mp_sizeof_nil();
++			if (result <= data_size)
++				data = mp_encode_nil(data);
++			f += 2;
++		}
++	}
++	return result;
++}
++
++size_t
++mp_format(char *data, size_t data_size, const char *format, ...)
++{
++	va_list args;
++	va_start(args, format);
++	size_t res = mp_vformat(data, data_size, format, args);
++	va_end(args);
++	return res;
++}
++
++#define MP_PRINT(SELF, PRINTF) \
++{										\
++	switch (mp_typeof(**data)) {						\
++	case MP_NIL:								\
++		mp_decode_nil(data);						\
++		PRINTF("null");							\
++		break;								\
++	case MP_UINT:								\
++		PRINTF("%llu", (unsigned long long) mp_decode_uint(data));	\
++		break;								\
++	case MP_INT:								\
++		PRINTF("%lld", (long long) mp_decode_int(data));		\
++		break;								\
++	case MP_STR:								\
++	case MP_BIN:								\
++	{									\
++		uint32_t len = mp_typeof(**data) == MP_STR ?			\
++			mp_decode_strl(data) : mp_decode_binl(data);		\
++		PRINTF("\"");							\
++		const char *s;							\
++		const char *end = *data + len;					\
++		for (s = *data; s < end; s++) {					\
++			unsigned char c = (unsigned char ) *s;			\
++			if (c < 128 && mp_char2escape[c] != NULL) {		\
++				/* Escape character */				\
++				PRINTF("%s", mp_char2escape[c]);		\
++			} else {						\
++				PRINTF("%c", c);				\
++			}							\
++		}								\
++		PRINTF("\"");							\
++		*data = end;							\
++		break;								\
++	}									\
++	case MP_ARRAY:								\
++	{									\
++		PRINTF("[");							\
++		if (depth <= 0) {						\
++			PRINTF("...");						\
++			mp_next(data);						\
++		} else {							\
++			--depth;						\
++			uint32_t count = mp_decode_array(data);			\
++			for (uint32_t i = 0; i < count; i++) {			\
++				if (i)						\
++					PRINTF(", ");				\
++				SELF(data);					\
++			}							\
++			++depth;						\
++		}								\
++		PRINTF("]");							\
++		break;								\
++	}									\
++	case MP_MAP:								\
++	{									\
++		PRINTF("{");							\
++		if (depth <= 0) {						\
++			PRINTF("...");						\
++			mp_next(data);						\
++		} else {							\
++			--depth;						\
++			uint32_t count = mp_decode_map(data);			\
++			for (uint32_t i = 0; i < count; i++) {			\
++				if (i)						\
++					PRINTF(", ");				\
++				SELF(data);					\
++				PRINTF(": ");					\
++				SELF(data);					\
++			}							\
++			++depth;						\
++		}								\
++		PRINTF("}");							\
++		break;								\
++	}									\
++	case MP_BOOL:								\
++		PRINTF(mp_decode_bool(data) ? "true" : "false");		\
++		break;								\
++	case MP_FLOAT:								\
++		PRINTF("%g", mp_decode_float(data));				\
++		break;								\
++	case MP_DOUBLE:								\
++		PRINTF("%lg", mp_decode_double(data));				\
++		break;								\
++	case MP_EXT:								\
++		PRINT_EXT(data);						\
++		break;								\
++	default:								\
++		mp_unreachable();						\
++		return -1;							\
++	}									\
++}
++
++int
++mp_fprint_recursion(FILE *file, const char **data, int depth)
++{
++	int total_bytes = 0;
++#define HANDLE(FUN, ...) do {							\
++	int bytes = FUN(file, __VA_ARGS__);					\
++	if (mp_unlikely(bytes < 0))						\
++		return -1;							\
++	total_bytes += bytes;							\
++} while (0)
++#define PRINT_EXT(...) HANDLE(mp_fprint_ext, __VA_ARGS__, depth)
++#define PRINT(...) HANDLE(fprintf, __VA_ARGS__)
++#define SELF(...) HANDLE(mp_fprint_recursion, __VA_ARGS__, depth)
++MP_PRINT(SELF, PRINT)
++#undef HANDLE
++#undef SELF
++#undef PRINT
++#undef PRINT_EXT
++	return total_bytes;
++}
++
++int
++mp_fprint(FILE *file, const char *data)
++{
++	if (!file)
++		file = stdout;
++	int res = mp_fprint_recursion(file, &data, MP_PRINT_MAX_DEPTH);
++	return res;
++}
++
++int
++mp_snprint_recursion(char *buf, int size, const char **data, int depth)
++{
++	int total_bytes = 0;
++#define HANDLE(FUN, ...) do {							\
++	int bytes = FUN(buf, size, __VA_ARGS__);				\
++	if (mp_unlikely(bytes < 0))						\
++		return -1;							\
++	total_bytes += bytes;							\
++	if (bytes < size) {							\
++		buf += bytes;							\
++		size -= bytes;							\
++	} else {								\
++		/* Calculate the number of bytes needed */			\
++		buf = NULL;							\
++		size = 0;							\
++	}									\
++} while (0)
++#define PRINT_EXT(...) HANDLE(mp_snprint_ext, __VA_ARGS__, depth)
++#define PRINT(...) HANDLE(snprintf, __VA_ARGS__)
++#define SELF(...) HANDLE(mp_snprint_recursion, __VA_ARGS__, depth)
++MP_PRINT(SELF, PRINT)
++#undef HANDLE
++#undef SELF
++#undef PRINT
++#undef PRINT_EXT
++	return total_bytes;
++}
++#undef MP_PRINT
++
++int
++mp_snprint(char *buf, int size, const char *data)
++{
++	return mp_snprint_recursion(buf, size, &data, MP_PRINT_MAX_DEPTH);
++}
+diff --git a/msgpuck.h b/msgpuck.h
+new file mode 100644
+index 00000000..e4429f4f
+--- /dev/null
++++ b/msgpuck.h
+@@ -0,0 +1,2707 @@
++#ifndef MSGPUCK_H_INCLUDED
++#define MSGPUCK_H_INCLUDED
++
++/*
++ * Copyright (c) 2021 The TCPDUMP project
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ * Initial contribution by Pavel Balaev (balaev@tarantool.org).
++ */
++
++/*
++ * Copyright (c) 2013-2017 MsgPuck Authors
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or
++ * without modification, are permitted provided that the following
++ * conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above
++ *    copyright notice, this list of conditions and the
++ *    following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above
++ *    copyright notice, this list of conditions and the following
++ *    disclaimer in the documentation and/or other materials
++ *    provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
++ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
++ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++/**
++ * \file msgpuck.h
++ * MsgPuck
++ * \brief MsgPuck is a simple and efficient MsgPack encoder/decoder
++ * library in a single self-contained file.
++ *
++ * Usage example:
++ * \code
++ * // Encode
++ * char buf[1024];
++ * char *w = buf;
++ * w = mp_encode_array(w, 4);
++ * w = mp_encode_uint(w, 10);
++ * w = mp_encode_str(w, "hello world", strlen("hello world"));
++ * w = mp_encode_bool(w, true);
++ * w = mp_encode_double(w, 3.1415);
++ *
++ * // Validate
++ * const char *b = buf;
++ * int r = mp_check(&b, w);
++ * assert(!r);
++ * assert(b == w);
++ *
++ * // Decode
++ * uint32_t size;
++ * uint64_t ival;
++ * const char *sval;
++ * uint32_t sval_len;
++ * bool bval;
++ * double dval;
++ *
++ * const char *r = buf;
++ *
++ * size = mp_decode_array(&r);
++ * // size is 4
++ *
++ * ival = mp_decode_uint(&r);
++ * // ival is 10;
++ *
++ * sval = mp_decode_str(&r, &sval_len);
++ * // sval is "hello world", sval_len is strlen("hello world")
++ *
++ * bval = mp_decode_bool(&r);
++ * // bval is true
++ *
++ * dval = mp_decode_double(&r);
++ * // dval is 3.1415
++ *
++ * assert(r == w);
++ * \endcode
++ *
++ * \note Supported compilers.
++ * The implementation requires a C99+ or C++03+ compatible compiler.
++ *
++ * \note Inline functions.
++ * The implementation is compatible with both C99 and GNU inline functions.
++ * Please link libmsgpuck.a static library for non-inlined versions of
++ * functions and global tables.
++ */
++
++#if defined(__cplusplus) && !defined(__STDC_CONSTANT_MACROS)
++#define __STDC_CONSTANT_MACROS 1 /* make С++ to be happy */
++#endif
++#if defined(__cplusplus) && !defined(__STDC_LIMIT_MACROS)
++#define __STDC_LIMIT_MACROS 1    /* make С++ to be happy */
++#endif
++#include <stdlib.h>
++#include <stdint.h>
++#include <stddef.h>
++#include <stdbool.h>
++#include <string.h>
++#include <assert.h>
++#include <stdarg.h>
++#include <stdio.h>
++
++#if defined(__cplusplus)
++extern "C" {
++#endif /* defined(__cplusplus) */
++
++/*
++ * {{{ Platform-specific definitions
++ */
++
++/** \cond false **/
++
++#if defined(__CC_ARM)         /* set the alignment to 1 for armcc compiler */
++#define MP_PACKED    __packed
++#define MP_PACKED_END 
++#define MP_CONST __attribute__((const))
++#define MP_PURE __attribute__((pure))
++#elif defined(__GNUC__)
++#define MP_PACKED  __attribute__((packed))
++#define MP_PACKED_END 
++#define MP_CONST __attribute__((const))
++#define MP_PURE __attribute__((pure))
++#elif defined(_MSC_VER)
++#define MP_CONST 
++#define MP_PURE 
++#define MP_PACKED __pragma(pack(push, 1))
++#define MP_PACKED_END __pragma(pack(pop))
++#endif
++
++#if defined(MP_SOURCE)
++#error MP_SOURCE is not supported anymore, please link libmsgpuck.a
++#endif
++
++#if defined(__GNUC__) && !defined(__GNUC_STDC_INLINE__)
++#if !defined(MP_LIBRARY)
++#define MP_PROTO extern inline
++#define MP_IMPL extern inline
++#else /* defined(MP_LIBRARY) */
++#define MP_PROTO
++#define MP_IMPL
++#endif
++#define MP_ALWAYSINLINE
++#else /* C99 inline */
++#if !defined(MP_LIBRARY)
++#define MP_PROTO inline
++#define MP_IMPL inline
++#else /* defined(MP_LIBRARY) */
++#define MP_PROTO extern inline
++#define MP_IMPL inline
++#endif
++#ifndef _WIN32
++#define MP_ALWAYSINLINE __attribute__((always_inline))
++#else
++#define MP_ALWAYSINLINE
++#endif
++#endif /* GNU inline or C99 inline */
++
++#if !defined __GNUC_MINOR__ || defined __INTEL_COMPILER || \
++	defined __SUNPRO_C || defined __SUNPRO_CC
++#define MP_GCC_VERSION(major, minor) 0
++#else
++#define MP_GCC_VERSION(major, minor) (__GNUC__ > (major) || \
++	(__GNUC__ == (major) && __GNUC_MINOR__ >= (minor)))
++#endif
++
++#if !defined(__has_builtin)
++#define __has_builtin(x) 0 /* clang */
++#endif
++
++#if MP_GCC_VERSION(2, 9) || __has_builtin(__builtin_expect)
++#define mp_likely(x) __builtin_expect((x), 1)
++#define mp_unlikely(x) __builtin_expect((x), 0)
++#else
++#define mp_likely(x) (x)
++#define mp_unlikely(x) (x)
++#endif
++
++#if MP_GCC_VERSION(4, 5) || __has_builtin(__builtin_unreachable)
++#define mp_unreachable() (assert(0), __builtin_unreachable())
++#else
++#ifndef _WIN32
++MP_PROTO void
++mp_unreachable(void) __attribute__((noreturn));
++#else
++static void __declspec(noreturn) mp_unreachable(void) {
++	assert(0);
++}
++#endif
++#if 0
++MP_PROTO void
++mp_unreachable(void) { assert(0); abort(); }
++#define mp_unreachable() (assert(0))
++#endif
++#endif
++
++#define mp_identity(x) (x) /* just to simplify mp_load/mp_store macroses */
++
++#if MP_GCC_VERSION(4, 8) || __has_builtin(__builtin_bswap16)
++#define mp_bswap_u16(x) __builtin_bswap16(x)
++#else /* !MP_GCC_VERSION(4, 8) */
++#define mp_bswap_u16(x) ( \
++	(((x) <<  8) & 0xff00) | \
++	(((x) >>  8) & 0x00ff) )
++#endif
++
++#if MP_GCC_VERSION(4, 3) || __has_builtin(__builtin_bswap32)
++#define mp_bswap_u32(x) __builtin_bswap32(x)
++#else /* !MP_GCC_VERSION(4, 3) */
++#define mp_bswap_u32(x) ( \
++	(((x) << 24) & UINT32_C(0xff000000)) | \
++	(((x) <<  8) & UINT32_C(0x00ff0000)) | \
++	(((x) >>  8) & UINT32_C(0x0000ff00)) | \
++	(((x) >> 24) & UINT32_C(0x000000ff)) )
++#endif
++
++#if MP_GCC_VERSION(4, 3) || __has_builtin(__builtin_bswap64)
++#define mp_bswap_u64(x) __builtin_bswap64(x)
++#else /* !MP_GCC_VERSION(4, 3) */
++#define mp_bswap_u64(x) (\
++	(((x) << 56) & UINT64_C(0xff00000000000000)) | \
++	(((x) << 40) & UINT64_C(0x00ff000000000000)) | \
++	(((x) << 24) & UINT64_C(0x0000ff0000000000)) | \
++	(((x) <<  8) & UINT64_C(0x000000ff00000000)) | \
++	(((x) >>  8) & UINT64_C(0x00000000ff000000)) | \
++	(((x) >> 24) & UINT64_C(0x0000000000ff0000)) | \
++	(((x) >> 40) & UINT64_C(0x000000000000ff00)) | \
++	(((x) >> 56) & UINT64_C(0x00000000000000ff)) )
++#endif
++
++#define MP_LOAD_STORE(name, type, bswap)					\
++MP_PROTO type									\
++mp_load_##name(const char **data);						\
++MP_IMPL type									\
++mp_load_##name(const char **data)						\
++{										\
++	struct MP_PACKED cast { type val; } MP_PACKED_END ;					\
++	type val = bswap(((struct cast *) *data)->val);				\
++	*data += sizeof(type);							\
++	return val;								\
++}										\
++MP_PROTO char *									\
++mp_store_##name(char *data, type val);						\
++MP_IMPL char *									\
++mp_store_##name(char *data, type val)						\
++{										\
++	struct MP_PACKED cast { type val; } MP_PACKED_END ;					\
++	((struct cast *) (data))->val = bswap(val);				\
++	return data + sizeof(type);						\
++}
++
++MP_LOAD_STORE(u8, uint8_t, mp_identity);
++
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++
++MP_LOAD_STORE(u16, uint16_t, mp_bswap_u16);
++MP_LOAD_STORE(u32, uint32_t, mp_bswap_u32);
++MP_LOAD_STORE(u64, uint64_t, mp_bswap_u64);
++
++#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++
++MP_LOAD_STORE(u16, uint16_t, mp_identity);
++MP_LOAD_STORE(u32, uint32_t, mp_identity);
++MP_LOAD_STORE(u64, uint64_t, mp_identity);
++
++#else
++#error Unsupported __BYTE_ORDER__
++#endif
++
++#if !defined(__FLOAT_WORD_ORDER__)
++#define __FLOAT_WORD_ORDER__ __BYTE_ORDER__
++#endif /* defined(__FLOAT_WORD_ORDER__) */
++
++#if __FLOAT_WORD_ORDER__ == __ORDER_LITTLE_ENDIAN__
++
++/*
++ * Idiots from msgpack.org byte-swaps even IEEE754 float/double types.
++ * Some platforms (e.g. arm) cause SIGBUS on attempt to store
++ * invalid float in registers, so code like flt = mp_bswap_float(flt)
++ * can't be used here.
++ */
++
++union MP_PACKED mp_float_cast  {
++	uint32_t u32;
++	float f;
++} MP_PACKED_END ;
++
++union MP_PACKED mp_double_cast {
++	uint64_t u64;
++	double d;
++} MP_PACKED_END ;
++
++MP_PROTO float
++mp_load_float(const char **data);
++MP_PROTO double
++mp_load_double(const char **data);
++MP_PROTO char *
++mp_store_float(char *data, float val);
++MP_PROTO char *
++mp_store_double(char *data, double val);
++
++MP_IMPL float
++mp_load_float(const char **data)
++{
++	union mp_float_cast cast = *(union mp_float_cast *) *data;
++	*data += sizeof(cast);
++	cast.u32 = mp_bswap_u32(cast.u32);
++	return cast.f;
++}
++
++MP_IMPL double
++mp_load_double(const char **data)
++{
++	union mp_double_cast cast = *(union mp_double_cast *) *data;
++	*data += sizeof(cast);
++	cast.u64 = mp_bswap_u64(cast.u64);
++	return cast.d;
++}
++
++MP_IMPL char *
++mp_store_float(char *data, float val)
++{
++	union mp_float_cast cast;
++	cast.f = val;
++	cast.u32 = mp_bswap_u32(cast.u32);
++	*(union mp_float_cast *) (data) = cast;
++	return data + sizeof(cast);
++}
++
++MP_IMPL char *
++mp_store_double(char *data, double val)
++{
++	union mp_double_cast cast;
++	cast.d = val;
++	cast.u64 = mp_bswap_u64(cast.u64);
++	*(union mp_double_cast *) (data) = cast;
++	return data + sizeof(cast);
++}
++
++#elif __FLOAT_WORD_ORDER__ == __ORDER_BIG_ENDIAN__
++
++MP_LOAD_STORE(float, float, mp_identity);
++MP_LOAD_STORE(double, double, mp_identity);
++
++#else
++#error Unsupported __FLOAT_WORD_ORDER__
++#endif
++
++#undef mp_identity
++#undef MP_LOAD_STORE
++
++/** \endcond */
++
++/*
++ * }}}
++ */
++
++/*
++ * {{{ API definition
++ */
++
++/**
++ * \brief MsgPack data types
++ */
++enum mp_type {
++	MP_NIL = 0,
++	MP_UINT,
++	MP_INT,
++	MP_STR,
++	MP_BIN,
++	MP_ARRAY,
++	MP_MAP,
++	MP_BOOL,
++	MP_FLOAT,
++	MP_DOUBLE,
++	MP_EXT
++};
++
++/**
++ * \brief Determine MsgPack type by a first byte \a c of encoded data.
++ *
++ * Example usage:
++ * \code
++ * assert(MP_ARRAY == mp_typeof(0x90));
++ * \endcode
++ *
++ * \param c - a first byte of encoded data
++ * \return MsgPack type
++ */
++MP_PROTO MP_PURE enum mp_type
++mp_typeof(const char c);
++
++/**
++ * \brief Calculate exact buffer size needed to store an array header of
++ * \a size elements. Maximum return value is 5. For performance reasons you
++ * can preallocate buffer for maximum size without calling the function.
++ * \param size - a number of elements
++ * \return buffer size in bytes (max is 5)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_array(uint32_t size);
++
++/**
++ * \brief Encode an array header of \a size elements.
++ *
++ * All array members must be encoded after the header.
++ *
++ * Example usage:
++ * \code
++ * // Encode
++ * char buf[1024];
++ * char *w = buf;
++ * w = mp_encode_array(w, 2);
++ * w = mp_encode_uint(w, 10);
++ * w = mp_encode_uint(w, 15);
++ *
++ * // Decode
++ * const char *r = buf;
++ * uint32_t size = mp_decode_array(&r);
++ * for (uint32_t i = 0; i < size; i++) {
++ *     uint64_t val = mp_decode_uint(&r);
++ * }
++ * assert (r == w);
++ * \endcode
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param size - a number of elements
++ * \return \a data + \link mp_sizeof_array() mp_sizeof_array(size) \endlink
++ * \sa mp_sizeof_array
++ */
++MP_PROTO char *
++mp_encode_array(char *data, uint32_t size);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode an array header
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_ARRAY
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_array(const char *cur, const char *end);
++
++/**
++ * \brief Decode an array header from MsgPack \a data.
++ *
++ * All array members must be decoded after the header.
++ * \param data - the pointer to a buffer
++ * \return the number of elements in an array
++ * \post *data = *data + mp_sizeof_array(retval)
++ * \sa \link mp_encode_array() An usage example \endlink
++ */
++MP_PROTO uint32_t
++mp_decode_array(const char **data);
++
++/**
++ * \brief Calculate exact buffer size needed to store a map header of
++ * \a size elements. Maximum return value is 5. For performance reasons you
++ * can preallocate buffer for maximum size without calling the function.
++ * \param size - a number of elements
++ * \return buffer size in bytes (max is 5)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_map(uint32_t size);
++
++/**
++ * \brief Encode a map header of \a size elements.
++ *
++ * All map key-value pairs must be encoded after the header.
++ *
++ * Example usage:
++ * \code
++ * char buf[1024];
++ *
++ * // Encode
++ * char *w = buf;
++ * w = mp_encode_map(b, 2);
++ * w = mp_encode_str(b, "key1", 4);
++ * w = mp_encode_str(b, "value1", 6);
++ * w = mp_encode_str(b, "key2", 4);
++ * w = mp_encode_str(b, "value2", 6);
++ *
++ * // Decode
++ * const char *r = buf;
++ * uint32_t size = mp_decode_map(&r);
++ * for (uint32_t i = 0; i < size; i++) {
++ *      // Use switch(mp_typeof(**r)) to support more types
++ *     uint32_t key_len, val_len;
++ *     const char *key = mp_decode_str(&r, key_len);
++ *     const char *val = mp_decode_str(&r, val_len);
++ * }
++ * assert (r == w);
++ * \endcode
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param size - a number of key/value pairs
++ * \return \a data + \link mp_sizeof_map() mp_sizeof_map(size)\endlink
++ * \sa mp_sizeof_map
++ */
++MP_PROTO char *
++mp_encode_map(char *data, uint32_t size);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a map header
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_MAP
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_map(const char *cur, const char *end);
++
++/**
++ * \brief Decode a map header from MsgPack \a data.
++ *
++ * All map key-value pairs must be decoded after the header.
++ * \param data - the pointer to a buffer
++ * \return the number of key/value pairs in a map
++ * \post *data = *data + mp_sizeof_array(retval)
++ * \sa \link mp_encode_map() An usage example \endlink
++ */
++MP_PROTO uint32_t
++mp_decode_map(const char **data);
++
++/**
++ * \brief calculate exact buffer size needed to store
++ * ext header for a value of length \a len.
++ * \param len value length in bytes.
++ * \retval buffer size in bytes
++ */
++MP_PROTO uint32_t
++mp_sizeof_extl(uint32_t len);
++
++/**
++ * \brief Equivalent to mp_sizeof_extl(\a len) + \a len.
++ * \param len - a extension data length
++ * \return size in chars (max is 6 + \a len)
++ */
++MP_PROTO uint32_t
++mp_sizeof_ext(uint32_t len);
++
++/**
++ * \brief Encode extension header with \a type and
++ * value length \a len.
++ * The value must be encoded after the header.
++ * \return \a data + \link mp_sizeof_extl() mp_sizeof_extl(size)\endlink
++ */
++MP_PROTO char *
++mp_encode_extl(char *data, int8_t type, uint32_t len);
++
++/**
++ * \brief Encode extension data of length \a len.
++ * The function is equivalent to mp_encode_extl() + memcpy.
++ * \param data - a buffer
++ * \param type - extension type to encode
++ * \param str - a pointer to extension data
++ * \param len - a extension data length
++ * \return \a data + mp_sizeof_ext(\a len) ==
++ * data + mp_sizeof_extl(\a len) + \a len
++ * \sa mp_encode_strl
++ */
++MP_PROTO char *
++mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode an ext header.
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the numbeer of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_EXT
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_extl(const char *cur, const char *end);
++
++/**
++ * \brief Decode an extension header from MsgPack \a data.
++ *
++ * The extension type value must be decoded after the header.
++ * \param data - the pointer to a buffer.
++ * \param type - decoded type of the following value.
++ * \retval - the length of the following ext value.
++ * \post *data = *data + mp_sizeof_extl(length)
++ */
++MP_PROTO uint32_t
++mp_decode_extl(const char **data, int8_t *type);
++
++/**
++ * \brief Decode an extension from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \param type - the pointer to save extension type
++ * \param len - the pointer to save extension data length
++ * \return a pointer to decoded extension data
++ * \post *data = *data + mp_sizeof_ext(*len)
++ */
++MP_PROTO const char *
++mp_decode_ext(const char **data, int8_t *type, uint32_t *len);
++
++/**
++ * \brief Calculate exact buffer size needed to store an integer \a num.
++ * Maximum return value is 9. For performance reasons you can preallocate
++ * buffer for maximum size without calling the function.
++ * Example usage:
++ * \code
++ * char **data = ...;
++ * char *end = *data;
++ * my_buffer_ensure(mp_sizeof_uint(x), &end);
++ * // my_buffer_ensure(9, &end);
++ * mp_encode_uint(buffer, x);
++ * \endcode
++ * \param num - a number
++ * \return buffer size in bytes (max is 9)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_uint(uint64_t num);
++
++/**
++ * \brief Calculate exact buffer size needed to store an integer \a num.
++ * Maximum return value is 9. For performance reasons you can preallocate
++ * buffer for maximum size without calling the function.
++ * \param num - a number
++ * \return buffer size in bytes (max is 9)
++ * \pre \a num < 0
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_int(int64_t num);
++
++/**
++ * \brief Encode an unsigned integer \a num.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param num - a number
++ * \return \a data + mp_sizeof_uint(\a num)
++ * \sa \link mp_encode_array() An usage example \endlink
++ * \sa mp_sizeof_uint()
++ */
++MP_PROTO char *
++mp_encode_uint(char *data, uint64_t num);
++
++/**
++ * \brief Encode a signed integer \a num.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param num - a number
++ * \return \a data + mp_sizeof_int(\a num)
++ * \sa \link mp_encode_array() An usage example \endlink
++ * \sa mp_sizeof_int()
++ * \pre \a num < 0
++ */
++MP_PROTO char *
++mp_encode_int(char *data, int64_t num);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode an uint
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_UINT
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_uint(const char *cur, const char *end);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode an int
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_INT
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_int(const char *cur, const char *end);
++
++/**
++ * \brief Decode an unsigned integer from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return an unsigned number
++ * \post *data = *data + mp_sizeof_uint(retval)
++ */
++MP_PROTO uint64_t
++mp_decode_uint(const char **data);
++
++/**
++ * \brief Decode a signed integer from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return an unsigned number
++ * \post *data = *data + mp_sizeof_int(retval)
++ */
++MP_PROTO int64_t
++mp_decode_int(const char **data);
++
++/**
++ * \brief Compare two packed unsigned integers.
++ *
++ * The function is faster than two mp_decode_uint() calls.
++ * \param data_a unsigned int a
++ * \param data_b unsigned int b
++ * \retval < 0 when \a a < \a b
++ * \retval   0 when \a a == \a b
++ * \retval > 0 when \a a > \a b
++ */
++MP_PROTO MP_PURE int
++mp_compare_uint(const char *data_a, const char *data_b);
++
++/**
++ * \brief Calculate exact buffer size needed to store a float \a num.
++ * The return value is always 5. The function was added to provide integrity of
++ * the library.
++ * \param num - a float
++ * \return buffer size in bytes (always 5)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_float(float num);
++
++/**
++ * \brief Calculate exact buffer size needed to store a double \a num.
++ * The return value is either 5 or 9. The function was added to provide
++ * integrity of the library. For performance reasons you can preallocate buffer
++ * for maximum size without calling the function.
++ * \param num - a double
++ * \return buffer size in bytes (5 or 9)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_double(double num);
++
++/**
++ * \brief Encode a float \a num.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param num - a float
++ * \return \a data + mp_sizeof_float(\a num)
++ * \sa mp_sizeof_float()
++ * \sa \link mp_encode_array() An usage example \endlink
++ */
++MP_PROTO char *
++mp_encode_float(char *data, float num);
++
++/**
++ * \brief Encode a double \a num.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param num - a float
++ * \return \a data + mp_sizeof_double(\a num)
++ * \sa \link mp_encode_array() An usage example \endlink
++ * \sa mp_sizeof_double()
++ */
++MP_PROTO char *
++mp_encode_double(char *data, double num);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a float
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_FLOAT
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_float(const char *cur, const char *end);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a double
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_DOUBLE
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_double(const char *cur, const char *end);
++
++/**
++ * \brief Decode a float from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a float
++ * \post *data = *data + mp_sizeof_float(retval)
++ */
++MP_PROTO float
++mp_decode_float(const char **data);
++
++/**
++ * \brief Decode a double from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a double
++ * \post *data = *data + mp_sizeof_double(retval)
++ */
++MP_PROTO double
++mp_decode_double(const char **data);
++
++/**
++ * \brief Calculate exact buffer size needed to store a string header of
++ * length \a num. Maximum return value is 5. For performance reasons you can
++ * preallocate buffer for maximum size without calling the function.
++ * \param len - a string length
++ * \return size in chars (max is 5)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_strl(uint32_t len);
++
++/**
++ * \brief Equivalent to mp_sizeof_strl(\a len) + \a len.
++ * \param len - a string length
++ * \return size in chars (max is 5 + \a len)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_str(uint32_t len);
++
++/**
++ * \brief Calculate exact buffer size needed to store a binstring header of
++ * length \a num. Maximum return value is 5. For performance reasons you can
++ * preallocate buffer for maximum size without calling the function.
++ * \param len - a string length
++ * \return size in chars (max is 5)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_binl(uint32_t len);
++
++/**
++ * \brief Equivalent to mp_sizeof_binl(\a len) + \a len.
++ * \param len - a string length
++ * \return size in chars (max is 5 + \a len)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_bin(uint32_t len);
++
++/**
++ * \brief Encode a string header of length \a len.
++ *
++ * The function encodes MsgPack header (\em only header) for a string of
++ * length \a len. You should append actual string data to the buffer manually
++ * after encoding the header (exactly \a len bytes without trailing '\0').
++ *
++ * This approach is very useful for cases when the total length of the string
++ * is known in advance, but the string data is not stored in a single
++ * continuous buffer (e.g. network packets).
++ *
++ * It is your responsibility to ensure that \a data has enough space.
++ * Usage example:
++ * \code
++ * char buffer[1024];
++ * char *b = buffer;
++ * b = mp_encode_strl(b, hdr.total_len);
++ * char *s = b;
++ * memcpy(b, pkt1.data, pkt1.len);
++ * b += pkt1.len;
++ * // get next packet
++ * memcpy(b, pkt2.data, pkt2.len);
++ * b += pkt2.len;
++ * // get next packet
++ * memcpy(b, pkt1.data, pkt3.len);
++ * b += pkt3.len;
++ *
++ * // Check that all data was received
++ * assert(hdr.total_len == (uint32_t) (b - s))
++ * \endcode
++ * Hint: you can dynamically reallocate the buffer during the process.
++ * \param data - a buffer
++ * \param len - a string length
++ * \return \a data + mp_sizeof_strl(len)
++ * \sa mp_sizeof_strl()
++ */
++MP_PROTO char *
++mp_encode_strl(char *data, uint32_t len);
++
++/**
++ * \brief Encode a string of length \a len.
++ * The function is equivalent to mp_encode_strl() + memcpy.
++ * \param data - a buffer
++ * \param str - a pointer to string data
++ * \param len - a string length
++ * \return \a data + mp_sizeof_str(len) ==
++ * data + mp_sizeof_strl(len) + len
++ * \sa mp_encode_strl
++ */
++MP_PROTO char *
++mp_encode_str(char *data, const char *str, uint32_t len);
++
++/**
++ * \brief Encode a binstring header of length \a len.
++ * See mp_encode_strl() for more details.
++ * \param data - a bufer
++ * \param len - a string length
++ * \return data + mp_sizeof_binl(\a len)
++ * \sa mp_encode_strl
++ */
++MP_PROTO char *
++mp_encode_binl(char *data, uint32_t len);
++
++/**
++ * \brief Encode a binstring of length \a len.
++ * The function is equivalent to mp_encode_binl() + memcpy.
++ * \param data - a buffer
++ * \param str - a pointer to binstring data
++ * \param len - a binstring length
++ * \return \a data + mp_sizeof_bin(\a len) ==
++ * data + mp_sizeof_binl(\a len) + \a len
++ * \sa mp_encode_strl
++ */
++MP_PROTO char *
++mp_encode_bin(char *data, const char *str, uint32_t len);
++
++/**
++ * \brief Encode a sequence of values according to format string.
++ * Example: mp_format(buf, sz, "[%d {%d%s%d%s}]", 42, 0, "false", 1, "true");
++ * to get a msgpack array of two items: number 42 and map (0->"false, 2->"true")
++ * Does not write items that don't fit to data_size argument.
++ *
++ * \param data - a buffer
++ * \param data_size - a buffer size
++ * \param format - zero-end string, containing structure of resulting
++ * msgpack and types of next arguments.
++ * Format can contain '[' and ']' pairs, defining arrays,
++ * '{' and '}' pairs, defining maps, and format specifiers, described below:
++ * %d, %i - int
++ * %u - unsigned int
++ * %ld, %li - long
++ * %lu - unsigned long
++ * %lld, %lli - long long
++ * %llu - unsigned long long
++ * %hd, %hi - short
++ * %hu - unsigned short
++ * %hhd, %hhi - char (as number)
++ * %hhu - unsigned char (as number)
++ * %f - float
++ * %lf - double
++ * %b - bool
++ * %s - zero-end string
++ * %.*s - string with specified length
++ * %p - MsgPack data
++ * %.*p - MsgPack data with specified length
++ * %% is ignored
++ * %smthelse assert and undefined behaviour
++ * NIL - a nil value
++ * all other symbols are ignored.
++ *
++ * \return the number of requred bytes.
++ * \retval > data_size means that is not enough space
++ * and whole msgpack was not encoded.
++ */
++size_t
++mp_format(char *data, size_t data_size, const char *format, ...);
++
++/**
++ * \brief mp_format variation, taking variable argument list
++ * Example:
++ *  va_list args;
++ *  va_start(args, fmt);
++ *  mp_vformat(data, data_size, fmt, args);
++ *  va_end(args);
++ * \sa \link mp_format() mp_format() \endlink
++ */
++size_t
++mp_vformat(char *data, size_t data_size, const char *format, va_list args);
++
++/**
++ * \brief print MsgPack data \a file using JSON-like format.
++ * MP_EXT is printed as a non-standard JSON 'list':
++ *
++ *     (extension: type <type>, len <len>)
++ *
++ * For example:
++ *
++ *     (extension: type 10, len 35)
++ *
++ * Type is the MP_EXT type. Length is of the MP_EXT body, not
++ * counting its header. Since the 'list' and what is in it is not
++ * a standard JSON, printing a MessagePack buffer, having MP_EXT
++ * in it, may lead to an invalid JSON.
++ *
++ * However MP_EXT may be printed differently in case a proper
++ * virtual serializer was installed. \sa mp_fprint_ext_f.
++ *
++ * \param file - pointer to file (or NULL for stdout)
++ * \param data - pointer to buffer containing msgpack object
++ * \retval >=0 - the number of bytes printed
++ * \retval -1 - error
++ * \sa fprintf()
++ */
++int
++mp_fprint(FILE *file, const char *data);
++
++/**
++ * \brief Print MsgPack data to \a file using JSON-like format.
++ * Works exactly like \sa mp_fprint(), but allows to specify max
++ * depth, and changes \a data parameter. Intended to be used for
++ * MsgPack serialization recursion.
++ */
++int
++mp_fprint_recursion(FILE *file, const char **data, int depth);
++
++typedef int (*mp_fprint_ext_f)(FILE *file, const char **data, int depth);
++
++/**
++ * \brief Function called when need to serialize MP_EXT into a
++ * file.
++ */
++extern mp_fprint_ext_f mp_fprint_ext;
++
++/**
++ * \brief Default MP_EXT serializer into a file. Skips the object,
++ * ignores all the other arguments, and writes
++ *
++ *     (extension: type <type>, len <len>)
++ *
++ * \sa mp_fprint().
++ */
++int
++mp_fprint_ext_default(FILE *file, const char **data, int depth);
++
++/**
++ * \brief format MsgPack data to \a buf using JSON-like format.
++ * Behaves the same as \sa mp_fprint(), but with snprintf()
++ * semantics.
++ * \sa mp_fprint()
++ * \param buf - buffer to use
++ * \param size - buffer size. This function write at most size bytes
++ * (including the terminating null byte ('\0').
++ * \param data - pointer to buffer containing msgpack object
++ * \retval <size - the number of characters printed (excluding the null byte)
++ * \retval >=size - the number of characters (excluding the null byte),
++ *                  which would have been written to the final string if
++ *                  enough space had been available.
++ * \retval -1 - error
++ * \sa snprintf()
++ */
++int
++mp_snprint(char *buf, int size, const char *data);
++
++/**
++ * \brief Format MsgPack data to \a buf using JSON-like format.
++ * Works exactly like \sa mp_snprint(), but allows to specify max
++ * depth, and changes \a data parameter. Intended to be used for
++ * MsgPack serialization recursion.
++ */
++int
++mp_snprint_recursion(char *buf, int size, const char **data, int depth);
++
++typedef int (*mp_snprint_ext_f)(char *buf, int size, const char **data,
++				int depth);
++
++/**
++ * \brief Function called when need to serialize MP_EXT into a
++ * string.
++ */
++extern mp_snprint_ext_f mp_snprint_ext;
++
++/**
++ * \brief Default MP_EXT serializer into a string. Skips the
++ * object, ignores all the other arguments, and prints
++ *
++ *     (extension: type <type>, len <len>)
++ *
++ * \sa mp_snprint().
++ */
++int
++mp_snprint_ext_default(char *buf, int size, const char **data, int depth);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a string header
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_STR
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_strl(const char *cur, const char *end);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a binstring header
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_BIN
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_binl(const char *cur, const char *end);
++
++/**
++ * \brief Decode a length of a string from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a length of astring
++ * \post *data = *data + mp_sizeof_strl(retval)
++ * \sa mp_encode_strl
++ */
++MP_PROTO uint32_t
++mp_decode_strl(const char **data);
++
++/**
++ * \brief Decode a string from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \param len - the pointer to save a string length
++ * \return a pointer to a decoded string
++ * \post *data = *data + mp_sizeof_str(*len)
++ * \sa mp_encode_binl
++ */
++MP_PROTO const char *
++mp_decode_str(const char **data, uint32_t *len);
++
++/**
++ * \brief Decode a length of a binstring from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a length of a binstring
++ * \post *data = *data + mp_sizeof_binl(retval)
++ * \sa mp_encode_binl
++ */
++MP_PROTO uint32_t
++mp_decode_binl(const char **data);
++
++/**
++ * \brief Decode a binstring from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \param len - the pointer to save a binstring length
++ * \return a pointer to a decoded binstring
++ * \post *data = *data + mp_sizeof_str(*len)
++ * \sa mp_encode_binl
++ */
++MP_PROTO const char *
++mp_decode_bin(const char **data, uint32_t *len);
++
++/**
++ * \brief Decode a length of a string or binstring from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a length of a string
++ * \post *data = *data + mp_sizeof_strbinl(retval)
++ * \sa mp_encode_binl
++ */
++MP_PROTO uint32_t
++mp_decode_strbinl(const char **data);
++
++/**
++ * \brief Decode a string or binstring from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \param len - the pointer to save a binstring length
++ * \return a pointer to a decoded binstring
++ * \post *data = *data + mp_sizeof_strbinl(*len)
++ * \sa mp_encode_binl
++ */
++MP_PROTO const char *
++mp_decode_strbin(const char **data, uint32_t *len);
++
++/**
++ * \brief Calculate exact buffer size needed to store the nil value.
++ * The return value is always 1. The function was added to provide integrity of
++ * the library.
++ * \return buffer size in bytes (always 1)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_nil(void);
++
++/**
++ * \brief Encode the nil value.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \return \a data + mp_sizeof_nil()
++ * \sa \link mp_encode_array() An usage example \endlink
++ * \sa mp_sizeof_nil()
++ */
++MP_PROTO char *
++mp_encode_nil(char *data);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode nil
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_NIL
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_nil(const char *cur, const char *end);
++
++/**
++ * \brief Decode the nil value from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \post *data = *data + mp_sizeof_nil()
++ */
++MP_PROTO void
++mp_decode_nil(const char **data);
++
++/**
++ * \brief Calculate exact buffer size needed to store a boolean value.
++ * The return value is always 1. The function was added to provide integrity of
++ * the library.
++ * \return buffer size in bytes (always 1)
++ */
++MP_PROTO MP_CONST uint32_t
++mp_sizeof_bool(bool val);
++
++/**
++ * \brief Encode a bool value \a val.
++ * It is your responsibility to ensure that \a data has enough space.
++ * \param data - a buffer
++ * \param val - a bool
++ * \return \a data + mp_sizeof_bool(val)
++ * \sa \link mp_encode_array() An usage example \endlink
++ * \sa mp_sizeof_bool()
++ */
++MP_PROTO char *
++mp_encode_bool(char *data, bool val);
++
++/**
++ * \brief Check that \a cur buffer has enough bytes to decode a bool value
++ * \param cur buffer
++ * \param end end of the buffer
++ * \retval 0 - buffer has enough bytes
++ * \retval > 0 - the number of remaining bytes to read
++ * \pre cur < end
++ * \pre mp_typeof(*cur) == MP_BOOL
++ */
++MP_PROTO MP_PURE ptrdiff_t
++mp_check_bool(const char *cur, const char *end);
++
++/**
++ * \brief Decode a bool value from MsgPack \a data
++ * \param data - the pointer to a buffer
++ * \return a decoded bool value
++ * \post *data = *data + mp_sizeof_bool(retval)
++ */
++MP_PROTO bool
++mp_decode_bool(const char **data);
++
++/**
++ * \brief Decode an integer value as int32_t from MsgPack \a data.
++ * \param data - the pointer to a buffer
++ * \param[out] ret - the pointer to save a result
++ * \retval  0 on success
++ * \retval -1 if underlying mp type is not MP_INT or MP_UINT
++ * \retval -1 if the result can't be stored in int32_t
++ */
++MP_PROTO int
++mp_read_int32(const char **data, int32_t *ret);
++
++/**
++ * \brief Decode an integer value as int64_t from MsgPack \a data.
++ * \param data - the pointer to a buffer
++ * \param[out] ret - the pointer to save a result
++ * \retval  0 on success
++ * \retval -1 if underlying mp type is not MP_INT or MP_UINT
++ * \retval -1 if the result can't be stored in int64_t
++ */
++MP_PROTO int
++mp_read_int64(const char **data, int64_t *ret);
++
++/**
++ * \brief Decode a floating point value as double from MsgPack \a data.
++ * \param data - the pointer to a buffer
++ * \param[out] ret - the pointer to save a result
++ * \retval  0 on success
++ * \retval -1 if underlying mp type is not MP_INT, MP_UINT,
++ *            MP_FLOAT, or MP_DOUBLE
++ * \retval -1 if the result can't be stored in double
++ */
++MP_PROTO int
++mp_read_double(const char **data, double *ret);
++
++/**
++ * \brief Skip one element in a packed \a data.
++ *
++ * The function is faster than mp_typeof + mp_decode_XXX() combination.
++ * For arrays and maps the function also skips all members.
++ * For strings and binstrings the function also skips the string data.
++ *
++ * Usage example:
++ * \code
++ * char buf[1024];
++ *
++ * char *w = buf;
++ * // First MsgPack object
++ * w = mp_encode_uint(w, 10);
++ *
++ * // Second MsgPack object
++ * w = mp_encode_array(w, 4);
++ *    w = mp_encode_array(w, 2);
++ *         // Begin of an inner array
++ *         w = mp_encode_str(w, "second inner 1", 14);
++ *         w = mp_encode_str(w, "second inner 2", 14);
++ *         // End of an inner array
++ *    w = mp_encode_str(w, "second", 6);
++ *    w = mp_encode_uint(w, 20);
++ *    w = mp_encode_bool(w, true);
++ *
++ * // Third MsgPack object
++ * w = mp_encode_str(w, "third", 5);
++ * // EOF
++ *
++ * const char *r = buf;
++ *
++ * // First MsgPack object
++ * assert(mp_typeof(**r) == MP_UINT);
++ * mp_next(&r); // skip the first object
++ *
++ * // Second MsgPack object
++ * assert(mp_typeof(**r) == MP_ARRAY);
++ * mp_decode_array(&r);
++ *     assert(mp_typeof(**r) == MP_ARRAY); // inner array
++ *     mp_next(&r); // -->> skip the entire inner array (with all members)
++ *     assert(mp_typeof(**r) == MP_STR); // second
++ *     mp_next(&r);
++ *     assert(mp_typeof(**r) == MP_UINT); // 20
++ *     mp_next(&r);
++ *     assert(mp_typeof(**r) == MP_BOOL); // true
++ *     mp_next(&r);
++ *
++ * // Third MsgPack object
++ * assert(mp_typeof(**r) == MP_STR); // third
++ * mp_next(&r);
++ *
++ * assert(r == w); // EOF
++ *
++ * \endcode
++ * \param data - the pointer to a buffer
++ * \post *data = *data + mp_sizeof_TYPE() where TYPE is mp_typeof(**data)
++ */
++MP_PROTO void
++mp_next(const char **data);
++
++/**
++ * \brief Equivalent to mp_next() but also validates MsgPack in \a data.
++ * \param data - the pointer to a buffer
++ * \param end - the end of a buffer
++ * \retval 0 when MsgPack in \a data is valid.
++ * \retval != 0 when MsgPack in \a data is not valid.
++ * \post *data = *data + mp_sizeof_TYPE() where TYPE is mp_typeof(**data)
++ * \post *data is not defined if MsgPack is not valid
++ * \sa mp_next()
++ */
++MP_PROTO int
++mp_check(const char **data, const char *end);
++
++/**
++ * The maximum msgpack nesting depth supported by mp_snprint().
++ * Everything beyond that will be omitted (replaced with "...").
++ */
++#ifndef MP_PRINT_MAX_DEPTH
++#define MP_PRINT_MAX_DEPTH 32
++#endif
++
++/** Message pack MP_MAP or MP_ARRAY container descriptor. */
++struct mp_frame {
++	/**
++	 * MP frame type calculated with mp_typeof().
++	 */
++	enum mp_type type;
++	/**
++	 * Total number of items in MP_MAP or MP_ARRAY container
++	 * calculated with mp_decode_map() or mp_decode_array().
++	 */
++	int count;
++	/**
++	 * Index of currently processing item. Must be less than
++	 * mp_frame::count member.
++	 */
++	int idx;
++};
++
++/**
++ * Stack of map/array descriptors mp_frame to preserve traversal
++ * state when parsing nested array/map in a msgpack stream.
++ * Makes it possible to parse nested MP_ARRAY and MP_MAP msgpack
++ * containers without recursion and easily determine that
++ * the container under the parsing cursor is complete.
++*/
++struct mp_stack {
++	/**
++	 * The maximum stack depth.
++	 */
++	int size;
++	/**
++	 * Count of used stack frames. Corresponds to the index
++	 * in the array to perform the push operation. Must be
++	 * less or equal to mp_stack::size member.
++	 */
++	int used;
++	/**
++	 * Array of size mp_stack::size of mp_frames.
++	 */
++	struct mp_frame *frames;
++};
++
++/**
++ * \brief Initialize mp_stack \a stack with specified size \a size
++ * and user-allocated array \a frames.
++ * The \a frames allocation must have at least \a size mp_frame
++ * items.
++ * \param stack - the pointer to a mp_stack to initialize.
++ * \param size - stack size, count of stack::frames to use.
++ * \param frames - mp_frame preallocated array of size \a size
++ *                 of struct mp_frame items
++ */
++MP_PROTO void
++mp_stack_create(struct mp_stack *stack, int size, struct mp_frame *frames);
++
++/**
++ * \brief Test if mp_stack \a stack is empty.
++ * \param stack - the pointer to a mp_stack to a stack to test.
++ * \retval true if mp_stack is empty, false otherwise.
++ */
++MP_PROTO bool
++mp_stack_is_empty(struct mp_stack *stack);
++
++/**
++ * \brief Test if mp_stack \a stack is full.
++ * \param stack - the pointer to a mp_stack to a stack to test.
++ * \retval true if mp_stack is full, false otherwise.
++ */
++MP_PROTO bool
++mp_stack_is_full(struct mp_stack *stack);
++
++/**
++ * \brief Return the top mp_stack \a stack frame.
++ * \param stack - the pointer to a mp_stack to operate with.
++ * \pre mp_stack_is_empty(stack) == false
++ */
++MP_PROTO struct mp_frame *
++mp_stack_top(struct mp_stack *stack);
++
++/**
++ * \brief Pop the top mp_stack \a stack frame.
++ * \param stack - the pointer to a mp_stack to operate with.
++ * \pre mp_stack_is_empty(stack) == false
++ */
++MP_PROTO void
++mp_stack_pop(struct mp_stack *stack);
++
++/**
++ * \brief Construct a new mp_frame and push it on to mp_stack
++ * \a stack.
++ * \param stack - the pointer to a stack to operate with.
++ * \param type - the type of mp_frame to create.
++ * \param count - the count of itemes of mp_frame to create.
++ * \pre mp_stack_is_full(stack) == false
++ */
++MP_PROTO void
++mp_stack_push(struct mp_stack *stack, enum mp_type type, int count);
++
++/**
++ * \brief Advance idx attribute of the \a frame.
++ * \param frame - the frame pointer to operate with.
++ * \retval true when mp_frame::idx is less than  mp_frame::count.
++ *         false otherwise.
++ */
++MP_PROTO bool
++mp_frame_advance(struct mp_frame *frame);
++
++/*
++ * }}}
++ */
++
++/*
++ * {{{ Implementation
++ */
++
++/** \cond false */
++extern const enum mp_type mp_type_hint[];
++extern const int8_t mp_parser_hint[];
++extern const char *mp_char2escape[];
++extern const uint8_t mp_ext_hint[];
++
++MP_IMPL MP_ALWAYSINLINE enum mp_type
++mp_typeof(const char c)
++{
++	return mp_type_hint[(uint8_t) c];
++}
++
++MP_IMPL uint32_t
++mp_sizeof_array(uint32_t size)
++{
++	if (size <= 15) {
++		return 1;
++	} else if (size <= UINT16_MAX) {
++		return 1 + sizeof(uint16_t);
++	} else {
++		return 1 + sizeof(uint32_t);
++	}
++}
++
++MP_IMPL char *
++mp_encode_array(char *data, uint32_t size)
++{
++	if (size <= 15) {
++		return mp_store_u8(data, 0x90 | size);
++	} else if (size <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xdc);
++		data = mp_store_u16(data, size);
++		return data;
++	} else {
++		data = mp_store_u8(data, 0xdd);
++		return mp_store_u32(data, size);
++	}
++}
++
++MP_IMPL ptrdiff_t
++mp_check_array(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_ARRAY);
++	uint8_t c = mp_load_u8(&cur);
++	if (mp_likely(!(c & 0x40)))
++		return cur - end;
++
++	assert(c >= 0xdc && c <= 0xdd); /* must be checked above by mp_typeof */
++	uint32_t hsize = 2U << (c & 0x1); /* 0xdc->2, 0xdd->4 */
++	return hsize - (end - cur);
++}
++
++MP_PROTO uint32_t
++mp_decode_array_slowpath(uint8_t c, const char **data);
++
++MP_IMPL uint32_t
++mp_decode_array_slowpath(uint8_t c, const char **data)
++{
++	uint32_t size;
++	switch (c & 0x1) {
++	case 0xdc & 0x1:
++		size = mp_load_u16(data);
++		return size;
++	case 0xdd & 0x1:
++		size = mp_load_u32(data);
++		return size;
++	default:
++		mp_unreachable();
++	}
++}
++
++MP_IMPL MP_ALWAYSINLINE uint32_t
++mp_decode_array(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++
++	if (mp_likely(!(c & 0x40)))
++		return (c & 0xf);
++
++	return mp_decode_array_slowpath(c, data);
++}
++
++MP_IMPL uint32_t
++mp_sizeof_map(uint32_t size)
++{
++	if (size <= 15) {
++		return 1;
++	} else if (size <= UINT16_MAX) {
++		return 1 + sizeof(uint16_t);
++	} else {
++		return 1 + sizeof(uint32_t);
++	}
++}
++
++MP_IMPL char *
++mp_encode_map(char *data, uint32_t size)
++{
++	if (size <= 15) {
++		return mp_store_u8(data, 0x80 | size);
++	} else if (size <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xde);
++		data = mp_store_u16(data, size);
++		return data;
++	} else {
++		data = mp_store_u8(data, 0xdf);
++		data = mp_store_u32(data, size);
++		return data;
++	}
++}
++
++MP_IMPL ptrdiff_t
++mp_check_map(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_MAP);
++	uint8_t c = mp_load_u8(&cur);
++	if (mp_likely((c & ~0xfU) == 0x80))
++		return cur - end;
++
++	assert(c >= 0xde && c <= 0xdf); /* must be checked above by mp_typeof */
++	uint32_t hsize = 2U << (c & 0x1); /* 0xde->2, 0xdf->4 */
++	return hsize - (end - cur);
++}
++
++MP_IMPL uint32_t
++mp_decode_map(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	switch (c) {
++	case 0xde:
++		return mp_load_u16(data);
++	case 0xdf:
++		return mp_load_u32(data);
++	default:
++		if (mp_unlikely(c < 0x80 || c > 0x8f))
++			mp_unreachable();
++		return c & 0xf;
++	}
++}
++
++MP_IMPL uint32_t
++mp_sizeof_extl(uint32_t len)
++{
++	if (len && len <= 16 && mp_ext_hint[len-1]) return 2;
++	if (len <= UINT8_MAX) return 3;
++	if (len <= UINT16_MAX) return 4;
++	else return 6;
++}
++
++MP_IMPL uint32_t
++mp_sizeof_ext(uint32_t len)
++{
++	return mp_sizeof_extl(len) + len;
++}
++
++MP_IMPL char *
++mp_encode_extl(char *data, int8_t type, uint32_t len)
++{
++	/*
++	 * Only use fixext when length is exactly 1, 2, 4, 8 or 16.
++	 * Otherwise use ext 8 if length <= 255.
++	 */
++	if (len && len <= 16 && mp_ext_hint[len-1]) {
++		data = mp_store_u8(data, mp_ext_hint[len-1]);
++	} else if (len <= UINT8_MAX) {
++		data = mp_store_u8(data, 0xc7);
++		data = mp_store_u8(data, (uint8_t) len);
++	} else if (len <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xc8);
++		data = mp_store_u16(data, (uint16_t) len);
++	} else {
++		data = mp_store_u8(data, 0xc9);
++		data = mp_store_u32(data,len);
++	}
++	data = mp_store_u8(data, type);
++	return data;
++}
++
++MP_IMPL char *
++mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len)
++{
++	data = mp_encode_extl(data, type, len);
++	memcpy(data, str, len);
++	return data + len;
++}
++
++MP_IMPL ptrdiff_t
++mp_check_extl(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_EXT);
++	uint8_t c = mp_load_u8(&cur);
++	if ((c & 0xf0) == 0xd0) {
++		return 1 - (end - cur);
++	}
++
++	assert(c >= 0xc7 && c <= 0xc9);
++	return (1 << (c - 0xc7)) + 1 - (end - cur); /* 0xc7 -> 2, 0xc8 -> 3, 0xc9 ->5 */
++}
++
++MP_IMPL uint32_t
++mp_decode_extl(const char **data, int8_t *type) {
++	uint8_t c = mp_load_u8(data);
++	uint32_t len;
++	switch 	 (c) {
++	case 0xd4:
++	case 0xd5:
++	case 0xd6:
++	case 0xd7:
++	case 0xd8:
++		len = 1u << (c - 0xd4);
++		break;
++	case 0xc7:
++		len = mp_load_u8(data);
++		break;
++	case 0xc8:
++		len = mp_load_u16(data);
++		break;
++	case 0xc9:
++		len = mp_load_u32(data);
++		break;
++	default:
++		mp_unreachable();
++	}
++	*type = mp_load_u8(data);
++	return len;
++}
++
++MP_IMPL const char *
++mp_decode_ext(const char **data, int8_t *type, uint32_t *len) {
++	assert(len != NULL);
++
++	*len = mp_decode_extl(data, type);
++	const char *str = *data;
++	*data += *len;
++	return str;
++}
++
++MP_IMPL uint32_t
++mp_sizeof_uint(uint64_t num)
++{
++	if (num <= 0x7f) {
++		return 1;
++	} else if (num <= UINT8_MAX) {
++		return 1 + sizeof(uint8_t);
++	} else if (num <= UINT16_MAX) {
++		return 1 + sizeof(uint16_t);
++	} else if (num <= UINT32_MAX) {
++		return 1 + sizeof(uint32_t);
++	} else {
++		return 1 + sizeof(uint64_t);
++	}
++}
++
++MP_IMPL uint32_t
++mp_sizeof_int(int64_t num)
++{
++	assert(num < 0);
++	if (num >= -0x20) {
++		return 1;
++	} else if (num >= INT8_MIN && num <= INT8_MAX) {
++		return 1 + sizeof(int8_t);
++	} else if (num >= INT16_MIN && num <= UINT16_MAX) {
++		return 1 + sizeof(int16_t);
++	} else if (num >= INT32_MIN && num <= UINT32_MAX) {
++		return 1 + sizeof(int32_t);
++	} else {
++		return 1 + sizeof(int64_t);
++	}
++}
++
++MP_IMPL ptrdiff_t
++mp_check_uint(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_UINT);
++	uint8_t c = mp_load_u8(&cur);
++	return mp_parser_hint[c] - (end - cur);
++}
++
++MP_IMPL ptrdiff_t
++mp_check_int(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_INT);
++	uint8_t c = mp_load_u8(&cur);
++	return mp_parser_hint[c] - (end - cur);
++}
++
++MP_IMPL char *
++mp_encode_uint(char *data, uint64_t num)
++{
++	if (num <= 0x7f) {
++		return mp_store_u8(data, (uint8_t)num);
++	} else if (num <= UINT8_MAX) {
++		data = mp_store_u8(data, 0xcc);
++		return mp_store_u8(data, (uint8_t)num);
++	} else if (num <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xcd);
++		return mp_store_u16(data, (uint16_t)num);
++	} else if (num <= UINT32_MAX) {
++		data = mp_store_u8(data, 0xce);
++		return mp_store_u32(data, (uint32_t)num);
++	} else {
++		data = mp_store_u8(data, 0xcf);
++		return mp_store_u64(data, num);
++	}
++}
++
++MP_IMPL char *
++mp_encode_int(char *data, int64_t num)
++{
++	assert(num < 0);
++	if (num >= -0x20) {
++		return mp_store_u8(data, (uint8_t)(0xe0 | num));
++	} else if (num >= INT8_MIN) {
++		data = mp_store_u8(data, 0xd0);
++		return mp_store_u8(data, (uint8_t)num);
++	} else if (num >= INT16_MIN) {
++		data = mp_store_u8(data, 0xd1);
++		return mp_store_u16(data, (uint16_t)num);
++	} else if (num >= INT32_MIN) {
++		data = mp_store_u8(data, 0xd2);
++		return mp_store_u32(data, (uint32_t)num);
++	} else {
++		data = mp_store_u8(data, 0xd3);
++		return mp_store_u64(data, num);
++	}
++}
++
++MP_IMPL uint64_t
++mp_decode_uint(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	switch (c) {
++	case 0xcc:
++		return mp_load_u8(data);
++	case 0xcd:
++		return mp_load_u16(data);
++	case 0xce:
++		return mp_load_u32(data);
++	case 0xcf:
++		return mp_load_u64(data);
++	default:
++		if (mp_unlikely(c > 0x7f))
++			mp_unreachable();
++		return c;
++	}
++}
++
++MP_IMPL int
++mp_compare_uint(const char *data_a, const char *data_b)
++{
++	uint8_t ca = mp_load_u8(&data_a);
++	uint8_t cb = mp_load_u8(&data_b);
++
++	int r = ca - cb;
++	if (r != 0)
++		return r;
++
++	if (ca <= 0x7f)
++		return 0;
++
++	uint64_t a, b;
++	switch (ca & 0x3) {
++	case 0xcc & 0x3:
++		a = mp_load_u8(&data_a);
++		b = mp_load_u8(&data_b);
++		break;
++	case 0xcd & 0x3:
++		a = mp_load_u16(&data_a);
++		b = mp_load_u16(&data_b);
++		break;
++	case 0xce & 0x3:
++		a = mp_load_u32(&data_a);
++		b = mp_load_u32(&data_b);
++		break;
++	case 0xcf & 0x3:
++		a = mp_load_u64(&data_a);
++		b = mp_load_u64(&data_b);
++		return a < b ? -1 : a > b;
++		break;
++	default:
++		mp_unreachable();
++	}
++
++	int64_t v = (a - b);
++	return (v > 0) - (v < 0);
++}
++
++MP_IMPL int64_t
++mp_decode_int(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	switch (c) {
++	case 0xd0:
++		return (int8_t) mp_load_u8(data);
++	case 0xd1:
++		return (int16_t) mp_load_u16(data);
++	case 0xd2:
++		return (int32_t) mp_load_u32(data);
++	case 0xd3:
++		return (int64_t) mp_load_u64(data);
++	default:
++		if (mp_unlikely(c < 0xe0))
++			mp_unreachable();
++		return (int8_t) (c);
++	}
++}
++
++MP_IMPL uint32_t
++mp_sizeof_float(float num)
++{
++	(void) num;
++	return 1 + sizeof(float);
++}
++
++MP_IMPL uint32_t
++mp_sizeof_double(double num)
++{
++	(void) num;
++	return 1 + sizeof(double);
++}
++
++MP_IMPL ptrdiff_t
++mp_check_float(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_FLOAT);
++	return 1 + sizeof(float) - (end - cur);
++}
++
++MP_IMPL ptrdiff_t
++mp_check_double(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_DOUBLE);
++	return 1 + sizeof(double) - (end - cur);
++}
++
++MP_IMPL char *
++mp_encode_float(char *data, float num)
++{
++	data = mp_store_u8(data, 0xca);
++	return mp_store_float(data, num);
++}
++
++MP_IMPL char *
++mp_encode_double(char *data, double num)
++{
++	data = mp_store_u8(data, 0xcb);
++	return mp_store_double(data, num);
++}
++
++MP_IMPL float
++mp_decode_float(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	assert(c == 0xca);
++	(void) c;
++	return mp_load_float(data);
++}
++
++MP_IMPL double
++mp_decode_double(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	assert(c == 0xcb);
++	(void) c;
++	return mp_load_double(data);
++}
++
++MP_IMPL uint32_t
++mp_sizeof_strl(uint32_t len)
++{
++	if (len <= 31) {
++		return 1;
++	} else if (len <= UINT8_MAX) {
++		return 1 + sizeof(uint8_t);
++	} else if (len <= UINT16_MAX) {
++		return 1 + sizeof(uint16_t);
++	} else {
++		return 1 + sizeof(uint32_t);
++	}
++}
++
++MP_IMPL uint32_t
++mp_sizeof_str(uint32_t len)
++{
++	return mp_sizeof_strl(len) + len;
++}
++
++MP_IMPL uint32_t
++mp_sizeof_binl(uint32_t len)
++{
++	if (len <= UINT8_MAX) {
++		return 1 + sizeof(uint8_t);
++	} else if (len <= UINT16_MAX) {
++		return 1 + sizeof(uint16_t);
++	} else {
++		return 1 + sizeof(uint32_t);
++	}
++}
++
++MP_IMPL uint32_t
++mp_sizeof_bin(uint32_t len)
++{
++	return mp_sizeof_binl(len) + len;
++}
++
++MP_IMPL char *
++mp_encode_strl(char *data, uint32_t len)
++{
++	if (len <= 31) {
++		return mp_store_u8(data, 0xa0 | (uint8_t) len);
++	} else if (len <= UINT8_MAX) {
++		data = mp_store_u8(data, 0xd9);
++		return mp_store_u8(data, len);
++	} else if (len <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xda);
++		return mp_store_u16(data, len);
++	} else {
++		data = mp_store_u8(data, 0xdb);
++		return mp_store_u32(data, len);
++	}
++}
++
++MP_IMPL char *
++mp_encode_str(char *data, const char *str, uint32_t len)
++{
++	data = mp_encode_strl(data, len);
++	memcpy(data, str, len);
++	return data + len;
++}
++
++MP_IMPL char *
++mp_encode_binl(char *data, uint32_t len)
++{
++	if (len <= UINT8_MAX) {
++		data = mp_store_u8(data, 0xc4);
++		return mp_store_u8(data, len);
++	} else if (len <= UINT16_MAX) {
++		data = mp_store_u8(data, 0xc5);
++		return mp_store_u16(data, len);
++	} else {
++		data = mp_store_u8(data, 0xc6);
++		return mp_store_u32(data, len);
++	}
++}
++
++MP_IMPL char *
++mp_encode_bin(char *data, const char *str, uint32_t len)
++{
++	data = mp_encode_binl(data, len);
++	memcpy(data, str, len);
++	return data + len;
++}
++
++MP_IMPL ptrdiff_t
++mp_check_strl(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_STR);
++
++	uint8_t c = mp_load_u8(&cur);
++	if (mp_likely(c & ~0x1f) == 0xa0)
++		return cur - end;
++
++	assert(c >= 0xd9 && c <= 0xdb); /* must be checked above by mp_typeof */
++	uint32_t hsize = 1U << (c & 0x3) >> 1; /* 0xd9->1, 0xda->2, 0xdb->4 */
++	return hsize - (end - cur);
++}
++
++MP_IMPL ptrdiff_t
++mp_check_binl(const char *cur, const char *end)
++{
++	uint8_t c = mp_load_u8(&cur);
++	assert(cur < end);
++	assert(mp_typeof(c) == MP_BIN);
++
++	assert(c >= 0xc4 && c <= 0xc6); /* must be checked above by mp_typeof */
++	uint32_t hsize = 1U << (c & 0x3); /* 0xc4->1, 0xc5->2, 0xc6->4 */
++	return hsize - (end - cur);
++}
++
++MP_IMPL uint32_t
++mp_decode_strl(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	switch (c) {
++	case 0xd9:
++		return mp_load_u8(data);
++	case 0xda:
++		return mp_load_u16(data);
++	case 0xdb:
++		return mp_load_u32(data);
++	default:
++		if (mp_unlikely(c < 0xa0 || c > 0xbf))
++			mp_unreachable();
++		return c & 0x1f;
++	}
++}
++
++MP_IMPL const char *
++mp_decode_str(const char **data, uint32_t *len)
++{
++	assert(len != NULL);
++
++	*len = mp_decode_strl(data);
++	const char *str = *data;
++	*data += *len;
++	return str;
++}
++
++MP_IMPL uint32_t
++mp_decode_binl(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++
++	switch (c) {
++	case 0xc4:
++		return mp_load_u8(data);
++	case 0xc5:
++		return mp_load_u16(data);
++	case 0xc6:
++		return mp_load_u32(data);
++	default:
++		mp_unreachable();
++	}
++}
++
++MP_IMPL const char *
++mp_decode_bin(const char **data, uint32_t *len)
++{
++	assert(len != NULL);
++
++	*len = mp_decode_binl(data);
++	const char *str = *data;
++	*data += *len;
++	return str;
++}
++
++MP_IMPL uint32_t
++mp_decode_strbinl(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++
++	switch (c) {
++	case 0xd9:
++		return mp_load_u8(data);
++	case 0xda:
++		return mp_load_u16(data);
++	case 0xdb:
++		return mp_load_u32(data);
++	case 0xc4:
++		return mp_load_u8(data);
++	case 0xc5:
++		return mp_load_u16(data);
++	case 0xc6:
++		return mp_load_u32(data);
++	default:
++		if (mp_unlikely(c < 0xa0 || c > 0xbf))
++			mp_unreachable();
++		return c & 0x1f;
++	}
++}
++
++MP_IMPL const char *
++mp_decode_strbin(const char **data, uint32_t *len)
++{
++	assert(len != NULL);
++
++	*len = mp_decode_strbinl(data);
++	const char *str = *data;
++	*data += *len;
++	return str;
++}
++
++MP_IMPL uint32_t
++mp_sizeof_nil()
++{
++	return 1;
++}
++
++MP_IMPL char *
++mp_encode_nil(char *data)
++{
++	return mp_store_u8(data, 0xc0);
++}
++
++MP_IMPL ptrdiff_t
++mp_check_nil(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_NIL);
++	return 1 - (end - cur);
++}
++
++MP_IMPL void
++mp_decode_nil(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	assert(c == 0xc0);
++	(void) c;
++}
++
++MP_IMPL uint32_t
++mp_sizeof_bool(bool val)
++{
++	(void) val;
++	return 1;
++}
++
++MP_IMPL char *
++mp_encode_bool(char *data, bool val)
++{
++	return mp_store_u8(data, 0xc2 | (val & 1));
++}
++
++MP_IMPL ptrdiff_t
++mp_check_bool(const char *cur, const char *end)
++{
++	assert(cur < end);
++	assert(mp_typeof(*cur) == MP_BOOL);
++	return 1 - (end - cur);
++}
++
++MP_IMPL bool
++mp_decode_bool(const char **data)
++{
++	uint8_t c = mp_load_u8(data);
++	switch (c) {
++	case 0xc3:
++		return true;
++	case 0xc2:
++		return false;
++	default:
++		mp_unreachable();
++	}
++}
++
++MP_IMPL int
++mp_read_int32(const char **data, int32_t *ret)
++{
++	uint32_t uval;
++	const char *p = *data;
++	uint8_t c = mp_load_u8(&p);
++	switch (c) {
++	case 0xd0:
++		*ret = (int8_t) mp_load_u8(&p);
++		break;
++	case 0xd1:
++		*ret = (int16_t) mp_load_u16(&p);
++		break;
++	case 0xd2:
++		*ret = (int32_t) mp_load_u32(&p);
++		break;
++	case 0xcc:
++		*ret = mp_load_u8(&p);
++		break;
++	case 0xcd:
++		*ret = mp_load_u16(&p);
++		break;
++	case 0xce:
++		uval = mp_load_u32(&p);
++		if (mp_unlikely(uval > INT32_MAX))
++			return -1;
++		*ret = uval;
++		break;
++	default:
++		if (mp_unlikely(c < 0xe0 && c > 0x7f))
++			return -1;
++		*ret = (int8_t) c;
++		break;
++	}
++	*data = p;
++	return 0;
++}
++
++MP_IMPL int
++mp_read_int64(const char **data, int64_t *ret)
++{
++	uint64_t uval;
++	const char *p = *data;
++	uint8_t c = mp_load_u8(&p);
++	switch (c) {
++	case 0xd0:
++		*ret = (int8_t) mp_load_u8(&p);
++		break;
++	case 0xd1:
++		*ret = (int16_t) mp_load_u16(&p);
++		break;
++	case 0xd2:
++		*ret = (int32_t) mp_load_u32(&p);
++		break;
++	case 0xd3:
++		*ret = (int64_t) mp_load_u64(&p);
++		break;
++	case 0xcc:
++		*ret = mp_load_u8(&p);
++		break;
++	case 0xcd:
++		*ret = mp_load_u16(&p);
++		break;
++	case 0xce:
++		*ret = mp_load_u32(&p);
++		break;
++	case 0xcf:
++		uval = mp_load_u64(&p);
++		if (uval > INT64_MAX)
++			return -1;
++		*ret = uval;
++		break;
++	default:
++		if (mp_unlikely(c < 0xe0 && c > 0x7f))
++			return -1;
++		*ret = (int8_t) c;
++		break;
++	}
++	*data = p;
++	return 0;
++}
++
++MP_IMPL int
++mp_read_double(const char **data, double *ret)
++{
++	int64_t ival;
++	uint64_t uval;
++	double val;
++	const char *p = *data;
++	uint8_t c = mp_load_u8(&p);
++	switch (c) {
++	case 0xd0:
++		*ret = (int8_t) mp_load_u8(&p);
++		break;
++	case 0xd1:
++		*ret = (int16_t) mp_load_u16(&p);
++		break;
++	case 0xd2:
++		*ret = (int32_t) mp_load_u32(&p);
++		break;
++	case 0xd3:
++		ival = (int64_t) mp_load_u64(&p);
++		val = (double) ival;
++		if ((int64_t)val != ival)
++			return -1;
++		*ret = val;
++		break;
++	case 0xcc:
++		*ret = mp_load_u8(&p);
++		break;
++	case 0xcd:
++		*ret = mp_load_u16(&p);
++		break;
++	case 0xce:
++		*ret = mp_load_u32(&p);
++		break;
++	case 0xcf:
++		uval = mp_load_u64(&p);
++		val = (double)uval;
++		if ((uint64_t)val != uval)
++			return -1;
++		*ret = val;
++		break;
++	case 0xca:
++		*ret = mp_load_float(&p);
++		break;
++	case 0xcb:
++		*ret = mp_load_double(&p);
++		break;
++	default:
++		if (mp_unlikely(c < 0xe0 && c > 0x7f))
++			return -1;
++		*ret = (int8_t) c;
++		break;
++	}
++	*data = p;
++	return 0;
++}
++
++/** See mp_parser_hint */
++enum {
++	MP_HINT = -32,
++	MP_HINT_STR_8 = MP_HINT,
++	MP_HINT_STR_16 = MP_HINT - 1,
++	MP_HINT_STR_32 = MP_HINT - 2,
++	MP_HINT_ARRAY_16 = MP_HINT - 3,
++	MP_HINT_ARRAY_32 = MP_HINT - 4,
++	MP_HINT_MAP_16 = MP_HINT - 5,
++	MP_HINT_MAP_32 = MP_HINT - 6,
++	MP_HINT_EXT_8 = MP_HINT - 7,
++	MP_HINT_EXT_16 = MP_HINT - 8,
++	MP_HINT_EXT_32 = MP_HINT - 9
++};
++
++MP_PROTO void
++mp_next_slowpath(const char **data, int64_t k);
++
++MP_IMPL void
++mp_next_slowpath(const char **data, int64_t k)
++{
++	for (; k > 0; k--) {
++		uint8_t c = mp_load_u8(data);
++		int l = mp_parser_hint[c];
++		if (mp_likely(l >= 0)) {
++			/*
++			 *  Same one-byte-encoded-value optimisation.
++			 *  Good for skipping tons of NILs, zeros etc.
++			 *  Run not more than once per 64 cycles (or about)
++			 * in order to avoid degradation for other cases.
++			 *  Note that l == 0 means that the last byte (that is
++			 * in variable `c`) is one-byte-encoded-value.
++			 *  The idea of optimization is to read the next 8 bytes
++			 * as one 8byte uint and check if all bytes of that
++			 * word are the same value (`c`). If so - skip 8 bytes
++			 * at once and repeat.
++			 *  A small trick is used to create an 8byte uint that
++			 * consists of 8 bytes that equal to one byte (`c`):
++			 * by rules of multiplication if multiply an one-byte
++			 * value (for example 0xab) by 0x0101010101010101 we
++			 * will get 0xabababababababab. That works for any byte.
++			 */
++			if (mp_unlikely(l == 0 && k % 64 == 0)) {
++				/*
++				 * Check k > 8 that there are at least 8 values
++				 * more expected, that are at least 8 bytes of
++				 * total length, that allows us to read 8 bytes.
++				 */
++				while (k > 8) {
++					const char *save = *data;
++					uint64_t u = mp_load_u64(data);
++					/*
++					 * Check that `u` is 8 `c` bytes,
++					 * see the trick explanation above.
++					 */
++					if (u != c * 0x0101010101010101ull) {
++						/* Wrong, restore pointer. */
++						*data = save;
++						break;
++					}
++					/* Confirm reading of 8 values. */
++					k -= 8;
++				}
++				continue;
++			}
++			*data += l;
++			continue;
++		} else if (mp_likely(l > MP_HINT)) {
++			k -= l;
++			continue;
++		}
++
++		uint32_t len;
++		switch (l) {
++		case MP_HINT_STR_8:
++			/* MP_STR (8) */
++			len = mp_load_u8(data);
++			*data += len;
++			break;
++		case MP_HINT_STR_16:
++			/* MP_STR (16) */
++			len = mp_load_u16(data);
++			*data += len;
++			break;
++		case MP_HINT_STR_32:
++			/* MP_STR (32) */
++			len = mp_load_u32(data);
++			*data += len;
++			break;
++		case MP_HINT_ARRAY_16:
++			/* MP_ARRAY (16) */
++			k += mp_load_u16(data);
++			break;
++		case MP_HINT_ARRAY_32:
++			/* MP_ARRAY (32) */
++			k += mp_load_u32(data);
++			break;
++		case MP_HINT_MAP_16:
++			/* MP_MAP (16) */
++			k += 2 * mp_load_u16(data);
++			break;
++		case MP_HINT_MAP_32:
++			/* MP_MAP (32) */
++			k += 2 * mp_load_u32(data);
++			break;
++		case MP_HINT_EXT_8:
++			/* MP_EXT (8) */
++			len = mp_load_u8(data);
++			mp_load_u8(data);
++			*data += len;
++			break;
++		case MP_HINT_EXT_16:
++			/* MP_EXT (16) */
++			len = mp_load_u16(data);
++			mp_load_u8(data);
++			*data += len;
++			break;
++		case MP_HINT_EXT_32:
++			/* MP_EXT (32) */
++			len = mp_load_u32(data);
++			mp_load_u8(data);
++			*data += len;
++			break;
++		default:
++			mp_unreachable();
++		}
++	}
++}
++
++MP_IMPL void
++mp_next(const char **data)
++{
++	int64_t k = 1;
++	for (; k > 0; k--) {
++		uint8_t c = mp_load_u8(data);
++		int l = mp_parser_hint[c];
++		if (mp_likely(l >= 0)) {
++			*data += l;
++			continue;
++		} else if (mp_likely(c == 0xd9)){
++			/* MP_STR (8) */
++			uint8_t len = mp_load_u8(data);
++			*data += len;
++			continue;
++		} else if (l > MP_HINT) {
++			k -= l;
++			continue;
++		} else {
++			*data -= sizeof(uint8_t);
++			mp_next_slowpath(data, k);
++			return;
++		}
++	}
++}
++
++MP_IMPL int
++mp_check(const char **data, const char *end)
++{
++#define MP_CHECK_LEN(_l) \
++	if (mp_unlikely((size_t)(end - *data) < (size_t)(_l))) \
++		return 1;
++
++	int64_t k;
++	for (k = 1; k > 0; k--) {
++		MP_CHECK_LEN(1);
++		uint8_t c = mp_load_u8(data);
++		int l = mp_parser_hint[c];
++		if (mp_likely(l >= 0)) {
++			MP_CHECK_LEN(l);
++			*data += l;
++			continue;
++		} else if (mp_likely(l > MP_HINT)) {
++			k -= l;
++			continue;
++		}
++
++		uint32_t len;
++		switch (l) {
++		case MP_HINT_STR_8:
++			/* MP_STR (8) */
++			MP_CHECK_LEN(sizeof(uint8_t));
++			len = mp_load_u8(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		case MP_HINT_STR_16:
++			/* MP_STR (16) */
++			MP_CHECK_LEN(sizeof(uint16_t));
++			len = mp_load_u16(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		case MP_HINT_STR_32:
++			/* MP_STR (32) */
++			MP_CHECK_LEN(sizeof(uint32_t))
++			len = mp_load_u32(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		case MP_HINT_ARRAY_16:
++			/* MP_ARRAY (16) */
++			MP_CHECK_LEN(sizeof(uint16_t));
++			k += mp_load_u16(data);
++			break;
++		case MP_HINT_ARRAY_32:
++			/* MP_ARRAY (32) */
++			MP_CHECK_LEN(sizeof(uint32_t));
++			k += mp_load_u32(data);
++			break;
++		case MP_HINT_MAP_16:
++			/* MP_MAP (16) */
++			MP_CHECK_LEN(sizeof(uint16_t));
++			k += 2 * mp_load_u16(data);
++			break;
++		case MP_HINT_MAP_32:
++			/* MP_MAP (32) */
++			MP_CHECK_LEN(sizeof(uint32_t));
++			k += 2 * mp_load_u32(data);
++			break;
++		case MP_HINT_EXT_8:
++			/* MP_EXT (8) */
++			MP_CHECK_LEN(sizeof(uint8_t) + sizeof(uint8_t));
++			len = mp_load_u8(data);
++			mp_load_u8(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		case MP_HINT_EXT_16:
++			/* MP_EXT (16) */
++			MP_CHECK_LEN(sizeof(uint16_t) + sizeof(uint8_t));
++			len = mp_load_u16(data);
++			mp_load_u8(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		case MP_HINT_EXT_32:
++			/* MP_EXT (32) */
++			MP_CHECK_LEN(sizeof(uint32_t) + sizeof(uint8_t));
++			len = mp_load_u32(data);
++			mp_load_u8(data);
++			MP_CHECK_LEN(len);
++			*data += len;
++			break;
++		default:
++			mp_unreachable();
++		}
++	}
++
++	assert(*data <= end);
++#undef MP_CHECK_LEN
++	return 0;
++}
++
++MP_IMPL void
++mp_stack_create(struct mp_stack *stack, int size, struct mp_frame *frames)
++{
++	stack->frames = frames;
++	stack->size = size;
++	stack->used = 0;
++}
++
++MP_IMPL bool
++mp_stack_is_empty(struct mp_stack *stack)
++{
++	return stack->used == 0;
++}
++
++MP_IMPL bool
++mp_stack_is_full(struct mp_stack *stack)
++{
++	return stack->used >= stack->size;
++}
++
++MP_IMPL struct mp_frame *
++mp_stack_top(struct mp_stack *stack)
++{
++	assert(!mp_stack_is_empty(stack));
++	return &stack->frames[stack->used - 1];
++}
++
++MP_IMPL void
++mp_stack_pop(struct mp_stack *stack)
++{
++	assert(!mp_stack_is_empty(stack));
++	--stack->used;
++}
++
++MP_IMPL void
++mp_stack_push(struct mp_stack *stack, enum mp_type type, int count)
++{
++	assert(!mp_stack_is_full(stack));
++	int idx = stack->used++;
++	stack->frames[idx].type = type;
++	stack->frames[idx].count = count;
++	stack->frames[idx].idx = -1;
++}
++
++MP_IMPL bool
++mp_frame_advance(struct mp_frame *frame)
++{
++	if (frame->idx >= frame->count - 1)
++		return false;
++	++frame->idx;
++	return true;
++}
++
++/** \endcond */
++
++/*
++ * }}}
++ */
++
++#if defined(__cplusplus)
++} /* extern "C" */
++#endif /* defined(__cplusplus) */
++
++#undef MP_LIBRARY
++#undef MP_PROTO
++#undef MP_IMPL
++#undef MP_ALWAYSINLINE
++#undef MP_GCC_VERSION
++
++#endif /* MSGPUCK_H_INCLUDED */
+diff --git a/msgpuck_hints.c b/msgpuck_hints.c
+new file mode 100644
+index 00000000..e7d7c3d2
+--- /dev/null
++++ b/msgpuck_hints.c
+@@ -0,0 +1,727 @@
++/*
++ * Copyright (c) 2021 The TCPDUMP project
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ * Initial contribution by Pavel Balaev (balaev@tarantool.org).
++ */
++
++/*
++ * Copyright (c) 2013-2017 MsgPuck Authors
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or
++ * without modification, are permitted provided that the following
++ * conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above
++ *    copyright notice, this list of conditions and the
++ *    following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above
++ *    copyright notice, this list of conditions and the following
++ *    disclaimer in the documentation and/or other materials
++ *    provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
++ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
++ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
++ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
++ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include "msgpuck.h"
++
++/**
++ * This lookup table used by mp_sizeof() to determine enum mp_type by the first
++ * byte of MsgPack element.
++ */
++const enum mp_type mp_type_hint[256]= {
++	/* {{{ MP_UINT (fixed) */
++	/* 0x00 */ MP_UINT,
++	/* 0x01 */ MP_UINT,
++	/* 0x02 */ MP_UINT,
++	/* 0x03 */ MP_UINT,
++	/* 0x04 */ MP_UINT,
++	/* 0x05 */ MP_UINT,
++	/* 0x06 */ MP_UINT,
++	/* 0x07 */ MP_UINT,
++	/* 0x08 */ MP_UINT,
++	/* 0x09 */ MP_UINT,
++	/* 0x0a */ MP_UINT,
++	/* 0x0b */ MP_UINT,
++	/* 0x0c */ MP_UINT,
++	/* 0x0d */ MP_UINT,
++	/* 0x0e */ MP_UINT,
++	/* 0x0f */ MP_UINT,
++	/* 0x10 */ MP_UINT,
++	/* 0x11 */ MP_UINT,
++	/* 0x12 */ MP_UINT,
++	/* 0x13 */ MP_UINT,
++	/* 0x14 */ MP_UINT,
++	/* 0x15 */ MP_UINT,
++	/* 0x16 */ MP_UINT,
++	/* 0x17 */ MP_UINT,
++	/* 0x18 */ MP_UINT,
++	/* 0x19 */ MP_UINT,
++	/* 0x1a */ MP_UINT,
++	/* 0x1b */ MP_UINT,
++	/* 0x1c */ MP_UINT,
++	/* 0x1d */ MP_UINT,
++	/* 0x1e */ MP_UINT,
++	/* 0x1f */ MP_UINT,
++	/* 0x20 */ MP_UINT,
++	/* 0x21 */ MP_UINT,
++	/* 0x22 */ MP_UINT,
++	/* 0x23 */ MP_UINT,
++	/* 0x24 */ MP_UINT,
++	/* 0x25 */ MP_UINT,
++	/* 0x26 */ MP_UINT,
++	/* 0x27 */ MP_UINT,
++	/* 0x28 */ MP_UINT,
++	/* 0x29 */ MP_UINT,
++	/* 0x2a */ MP_UINT,
++	/* 0x2b */ MP_UINT,
++	/* 0x2c */ MP_UINT,
++	/* 0x2d */ MP_UINT,
++	/* 0x2e */ MP_UINT,
++	/* 0x2f */ MP_UINT,
++	/* 0x30 */ MP_UINT,
++	/* 0x31 */ MP_UINT,
++	/* 0x32 */ MP_UINT,
++	/* 0x33 */ MP_UINT,
++	/* 0x34 */ MP_UINT,
++	/* 0x35 */ MP_UINT,
++	/* 0x36 */ MP_UINT,
++	/* 0x37 */ MP_UINT,
++	/* 0x38 */ MP_UINT,
++	/* 0x39 */ MP_UINT,
++	/* 0x3a */ MP_UINT,
++	/* 0x3b */ MP_UINT,
++	/* 0x3c */ MP_UINT,
++	/* 0x3d */ MP_UINT,
++	/* 0x3e */ MP_UINT,
++	/* 0x3f */ MP_UINT,
++	/* 0x40 */ MP_UINT,
++	/* 0x41 */ MP_UINT,
++	/* 0x42 */ MP_UINT,
++	/* 0x43 */ MP_UINT,
++	/* 0x44 */ MP_UINT,
++	/* 0x45 */ MP_UINT,
++	/* 0x46 */ MP_UINT,
++	/* 0x47 */ MP_UINT,
++	/* 0x48 */ MP_UINT,
++	/* 0x49 */ MP_UINT,
++	/* 0x4a */ MP_UINT,
++	/* 0x4b */ MP_UINT,
++	/* 0x4c */ MP_UINT,
++	/* 0x4d */ MP_UINT,
++	/* 0x4e */ MP_UINT,
++	/* 0x4f */ MP_UINT,
++	/* 0x50 */ MP_UINT,
++	/* 0x51 */ MP_UINT,
++	/* 0x52 */ MP_UINT,
++	/* 0x53 */ MP_UINT,
++	/* 0x54 */ MP_UINT,
++	/* 0x55 */ MP_UINT,
++	/* 0x56 */ MP_UINT,
++	/* 0x57 */ MP_UINT,
++	/* 0x58 */ MP_UINT,
++	/* 0x59 */ MP_UINT,
++	/* 0x5a */ MP_UINT,
++	/* 0x5b */ MP_UINT,
++	/* 0x5c */ MP_UINT,
++	/* 0x5d */ MP_UINT,
++	/* 0x5e */ MP_UINT,
++	/* 0x5f */ MP_UINT,
++	/* 0x60 */ MP_UINT,
++	/* 0x61 */ MP_UINT,
++	/* 0x62 */ MP_UINT,
++	/* 0x63 */ MP_UINT,
++	/* 0x64 */ MP_UINT,
++	/* 0x65 */ MP_UINT,
++	/* 0x66 */ MP_UINT,
++	/* 0x67 */ MP_UINT,
++	/* 0x68 */ MP_UINT,
++	/* 0x69 */ MP_UINT,
++	/* 0x6a */ MP_UINT,
++	/* 0x6b */ MP_UINT,
++	/* 0x6c */ MP_UINT,
++	/* 0x6d */ MP_UINT,
++	/* 0x6e */ MP_UINT,
++	/* 0x6f */ MP_UINT,
++	/* 0x70 */ MP_UINT,
++	/* 0x71 */ MP_UINT,
++	/* 0x72 */ MP_UINT,
++	/* 0x73 */ MP_UINT,
++	/* 0x74 */ MP_UINT,
++	/* 0x75 */ MP_UINT,
++	/* 0x76 */ MP_UINT,
++	/* 0x77 */ MP_UINT,
++	/* 0x78 */ MP_UINT,
++	/* 0x79 */ MP_UINT,
++	/* 0x7a */ MP_UINT,
++	/* 0x7b */ MP_UINT,
++	/* 0x7c */ MP_UINT,
++	/* 0x7d */ MP_UINT,
++	/* 0x7e */ MP_UINT,
++	/* 0x7f */ MP_UINT,
++	/* }}} */
++
++	/* {{{ MP_MAP (fixed) */
++	/* 0x80 */ MP_MAP,
++	/* 0x81 */ MP_MAP,
++	/* 0x82 */ MP_MAP,
++	/* 0x83 */ MP_MAP,
++	/* 0x84 */ MP_MAP,
++	/* 0x85 */ MP_MAP,
++	/* 0x86 */ MP_MAP,
++	/* 0x87 */ MP_MAP,
++	/* 0x88 */ MP_MAP,
++	/* 0x89 */ MP_MAP,
++	/* 0x8a */ MP_MAP,
++	/* 0x8b */ MP_MAP,
++	/* 0x8c */ MP_MAP,
++	/* 0x8d */ MP_MAP,
++	/* 0x8e */ MP_MAP,
++	/* 0x8f */ MP_MAP,
++	/* }}} */
++
++	/* {{{ MP_ARRAY (fixed) */
++	/* 0x90 */ MP_ARRAY,
++	/* 0x91 */ MP_ARRAY,
++	/* 0x92 */ MP_ARRAY,
++	/* 0x93 */ MP_ARRAY,
++	/* 0x94 */ MP_ARRAY,
++	/* 0x95 */ MP_ARRAY,
++	/* 0x96 */ MP_ARRAY,
++	/* 0x97 */ MP_ARRAY,
++	/* 0x98 */ MP_ARRAY,
++	/* 0x99 */ MP_ARRAY,
++	/* 0x9a */ MP_ARRAY,
++	/* 0x9b */ MP_ARRAY,
++	/* 0x9c */ MP_ARRAY,
++	/* 0x9d */ MP_ARRAY,
++	/* 0x9e */ MP_ARRAY,
++	/* 0x9f */ MP_ARRAY,
++	/* }}} */
++
++	/* {{{ MP_STR (fixed) */
++	/* 0xa0 */ MP_STR,
++	/* 0xa1 */ MP_STR,
++	/* 0xa2 */ MP_STR,
++	/* 0xa3 */ MP_STR,
++	/* 0xa4 */ MP_STR,
++	/* 0xa5 */ MP_STR,
++	/* 0xa6 */ MP_STR,
++	/* 0xa7 */ MP_STR,
++	/* 0xa8 */ MP_STR,
++	/* 0xa9 */ MP_STR,
++	/* 0xaa */ MP_STR,
++	/* 0xab */ MP_STR,
++	/* 0xac */ MP_STR,
++	/* 0xad */ MP_STR,
++	/* 0xae */ MP_STR,
++	/* 0xaf */ MP_STR,
++	/* 0xb0 */ MP_STR,
++	/* 0xb1 */ MP_STR,
++	/* 0xb2 */ MP_STR,
++	/* 0xb3 */ MP_STR,
++	/* 0xb4 */ MP_STR,
++	/* 0xb5 */ MP_STR,
++	/* 0xb6 */ MP_STR,
++	/* 0xb7 */ MP_STR,
++	/* 0xb8 */ MP_STR,
++	/* 0xb9 */ MP_STR,
++	/* 0xba */ MP_STR,
++	/* 0xbb */ MP_STR,
++	/* 0xbc */ MP_STR,
++	/* 0xbd */ MP_STR,
++	/* 0xbe */ MP_STR,
++	/* 0xbf */ MP_STR,
++	/* }}} */
++
++	/* {{{ MP_NIL, MP_BOOL */
++	/* 0xc0 */ MP_NIL,
++	/* 0xc1 */ MP_EXT, /* never used */
++	/* 0xc2 */ MP_BOOL,
++	/* 0xc3 */ MP_BOOL,
++	/* }}} */
++
++	/* {{{ MP_BIN */
++	/* 0xc4 */ MP_BIN,   /* MP_BIN(8)  */
++	/* 0xc5 */ MP_BIN,   /* MP_BIN(16) */
++	/* 0xc6 */ MP_BIN,   /* MP_BIN(32) */
++	/* }}} */
++
++	/* {{{ MP_EXT */
++	/* 0xc7 */ MP_EXT,
++	/* 0xc8 */ MP_EXT,
++	/* 0xc9 */ MP_EXT,
++	/* }}} */
++
++	/* {{{ MP_FLOAT, MP_DOUBLE */
++	/* 0xca */ MP_FLOAT,
++	/* 0xcb */ MP_DOUBLE,
++	/* }}} */
++
++	/* {{{ MP_UINT */
++	/* 0xcc */ MP_UINT,
++	/* 0xcd */ MP_UINT,
++	/* 0xce */ MP_UINT,
++	/* 0xcf */ MP_UINT,
++	/* }}} */
++
++	/* {{{ MP_INT */
++	/* 0xd0 */ MP_INT,   /* MP_INT (8)  */
++	/* 0xd1 */ MP_INT,   /* MP_INT (16) */
++	/* 0xd2 */ MP_INT,   /* MP_INT (32) */
++	/* 0xd3 */ MP_INT,   /* MP_INT (64) */
++	/* }}} */
++
++	/* {{{ MP_EXT */
++	/* 0xd4 */ MP_EXT,   /* MP_INT (8)    */
++	/* 0xd5 */ MP_EXT,   /* MP_INT (16)   */
++	/* 0xd6 */ MP_EXT,   /* MP_INT (32)   */
++	/* 0xd7 */ MP_EXT,   /* MP_INT (64)   */
++	/* 0xd8 */ MP_EXT,   /* MP_INT (127)  */
++	/* }}} */
++
++	/* {{{ MP_STR */
++	/* 0xd9 */ MP_STR,   /* MP_STR(8)  */
++	/* 0xda */ MP_STR,   /* MP_STR(16) */
++	/* 0xdb */ MP_STR,   /* MP_STR(32) */
++	/* }}} */
++
++	/* {{{ MP_ARRAY */
++	/* 0xdc */ MP_ARRAY, /* MP_ARRAY(16)  */
++	/* 0xdd */ MP_ARRAY, /* MP_ARRAY(32)  */
++	/* }}} */
++
++	/* {{{ MP_MAP */
++	/* 0xde */ MP_MAP,   /* MP_MAP (16) */
++	/* 0xdf */ MP_MAP,   /* MP_MAP (32) */
++	/* }}} */
++
++	/* {{{ MP_INT */
++	/* 0xe0 */ MP_INT,
++	/* 0xe1 */ MP_INT,
++	/* 0xe2 */ MP_INT,
++	/* 0xe3 */ MP_INT,
++	/* 0xe4 */ MP_INT,
++	/* 0xe5 */ MP_INT,
++	/* 0xe6 */ MP_INT,
++	/* 0xe7 */ MP_INT,
++	/* 0xe8 */ MP_INT,
++	/* 0xe9 */ MP_INT,
++	/* 0xea */ MP_INT,
++	/* 0xeb */ MP_INT,
++	/* 0xec */ MP_INT,
++	/* 0xed */ MP_INT,
++	/* 0xee */ MP_INT,
++	/* 0xef */ MP_INT,
++	/* 0xf0 */ MP_INT,
++	/* 0xf1 */ MP_INT,
++	/* 0xf2 */ MP_INT,
++	/* 0xf3 */ MP_INT,
++	/* 0xf4 */ MP_INT,
++	/* 0xf5 */ MP_INT,
++	/* 0xf6 */ MP_INT,
++	/* 0xf7 */ MP_INT,
++	/* 0xf8 */ MP_INT,
++	/* 0xf9 */ MP_INT,
++	/* 0xfa */ MP_INT,
++	/* 0xfb */ MP_INT,
++	/* 0xfc */ MP_INT,
++	/* 0xfd */ MP_INT,
++	/* 0xfe */ MP_INT,
++	/* 0xff */ MP_INT
++	/* }}} */
++};
++
++/**
++ * This lookup table used by mp_next() and mp_check() to determine
++ * size of MsgPack element by its first byte.
++ * A positive value contains size of the element (excluding the first byte).
++ * A negative value means the element is compound (e.g. array or map)
++ * of size (-n).
++ * MP_HINT_* values used for special cases handled by switch() statement.
++ */
++const int8_t mp_parser_hint[256] = {
++	/* {{{ MP_UINT(fixed) **/
++	/* 0x00 */ 0,
++	/* 0x01 */ 0,
++	/* 0x02 */ 0,
++	/* 0x03 */ 0,
++	/* 0x04 */ 0,
++	/* 0x05 */ 0,
++	/* 0x06 */ 0,
++	/* 0x07 */ 0,
++	/* 0x08 */ 0,
++	/* 0x09 */ 0,
++	/* 0x0a */ 0,
++	/* 0x0b */ 0,
++	/* 0x0c */ 0,
++	/* 0x0d */ 0,
++	/* 0x0e */ 0,
++	/* 0x0f */ 0,
++	/* 0x10 */ 0,
++	/* 0x11 */ 0,
++	/* 0x12 */ 0,
++	/* 0x13 */ 0,
++	/* 0x14 */ 0,
++	/* 0x15 */ 0,
++	/* 0x16 */ 0,
++	/* 0x17 */ 0,
++	/* 0x18 */ 0,
++	/* 0x19 */ 0,
++	/* 0x1a */ 0,
++	/* 0x1b */ 0,
++	/* 0x1c */ 0,
++	/* 0x1d */ 0,
++	/* 0x1e */ 0,
++	/* 0x1f */ 0,
++	/* 0x20 */ 0,
++	/* 0x21 */ 0,
++	/* 0x22 */ 0,
++	/* 0x23 */ 0,
++	/* 0x24 */ 0,
++	/* 0x25 */ 0,
++	/* 0x26 */ 0,
++	/* 0x27 */ 0,
++	/* 0x28 */ 0,
++	/* 0x29 */ 0,
++	/* 0x2a */ 0,
++	/* 0x2b */ 0,
++	/* 0x2c */ 0,
++	/* 0x2d */ 0,
++	/* 0x2e */ 0,
++	/* 0x2f */ 0,
++	/* 0x30 */ 0,
++	/* 0x31 */ 0,
++	/* 0x32 */ 0,
++	/* 0x33 */ 0,
++	/* 0x34 */ 0,
++	/* 0x35 */ 0,
++	/* 0x36 */ 0,
++	/* 0x37 */ 0,
++	/* 0x38 */ 0,
++	/* 0x39 */ 0,
++	/* 0x3a */ 0,
++	/* 0x3b */ 0,
++	/* 0x3c */ 0,
++	/* 0x3d */ 0,
++	/* 0x3e */ 0,
++	/* 0x3f */ 0,
++	/* 0x40 */ 0,
++	/* 0x41 */ 0,
++	/* 0x42 */ 0,
++	/* 0x43 */ 0,
++	/* 0x44 */ 0,
++	/* 0x45 */ 0,
++	/* 0x46 */ 0,
++	/* 0x47 */ 0,
++	/* 0x48 */ 0,
++	/* 0x49 */ 0,
++	/* 0x4a */ 0,
++	/* 0x4b */ 0,
++	/* 0x4c */ 0,
++	/* 0x4d */ 0,
++	/* 0x4e */ 0,
++	/* 0x4f */ 0,
++	/* 0x50 */ 0,
++	/* 0x51 */ 0,
++	/* 0x52 */ 0,
++	/* 0x53 */ 0,
++	/* 0x54 */ 0,
++	/* 0x55 */ 0,
++	/* 0x56 */ 0,
++	/* 0x57 */ 0,
++	/* 0x58 */ 0,
++	/* 0x59 */ 0,
++	/* 0x5a */ 0,
++	/* 0x5b */ 0,
++	/* 0x5c */ 0,
++	/* 0x5d */ 0,
++	/* 0x5e */ 0,
++	/* 0x5f */ 0,
++	/* 0x60 */ 0,
++	/* 0x61 */ 0,
++	/* 0x62 */ 0,
++	/* 0x63 */ 0,
++	/* 0x64 */ 0,
++	/* 0x65 */ 0,
++	/* 0x66 */ 0,
++	/* 0x67 */ 0,
++	/* 0x68 */ 0,
++	/* 0x69 */ 0,
++	/* 0x6a */ 0,
++	/* 0x6b */ 0,
++	/* 0x6c */ 0,
++	/* 0x6d */ 0,
++	/* 0x6e */ 0,
++	/* 0x6f */ 0,
++	/* 0x70 */ 0,
++	/* 0x71 */ 0,
++	/* 0x72 */ 0,
++	/* 0x73 */ 0,
++	/* 0x74 */ 0,
++	/* 0x75 */ 0,
++	/* 0x76 */ 0,
++	/* 0x77 */ 0,
++	/* 0x78 */ 0,
++	/* 0x79 */ 0,
++	/* 0x7a */ 0,
++	/* 0x7b */ 0,
++	/* 0x7c */ 0,
++	/* 0x7d */ 0,
++	/* 0x7e */ 0,
++	/* 0x7f */ 0,
++	/* }}} */
++
++	/* {{{ MP_MAP (fixed) */
++	/* 0x80 */  0, /* empty map - just skip one byte */
++	/* 0x81 */ -2, /* 2 elements follow */
++	/* 0x82 */ -4,
++	/* 0x83 */ -6,
++	/* 0x84 */ -8,
++	/* 0x85 */ -10,
++	/* 0x86 */ -12,
++	/* 0x87 */ -14,
++	/* 0x88 */ -16,
++	/* 0x89 */ -18,
++	/* 0x8a */ -20,
++	/* 0x8b */ -22,
++	/* 0x8c */ -24,
++	/* 0x8d */ -26,
++	/* 0x8e */ -28,
++	/* 0x8f */ -30,
++	/* }}} */
++
++	/* {{{ MP_ARRAY (fixed) */
++	/* 0x90 */  0,  /* empty array - just skip one byte */
++	/* 0x91 */ -1,  /* 1 element follows */
++	/* 0x92 */ -2,
++	/* 0x93 */ -3,
++	/* 0x94 */ -4,
++	/* 0x95 */ -5,
++	/* 0x96 */ -6,
++	/* 0x97 */ -7,
++	/* 0x98 */ -8,
++	/* 0x99 */ -9,
++	/* 0x9a */ -10,
++	/* 0x9b */ -11,
++	/* 0x9c */ -12,
++	/* 0x9d */ -13,
++	/* 0x9e */ -14,
++	/* 0x9f */ -15,
++	/* }}} */
++
++	/* {{{ MP_STR (fixed) */
++	/* 0xa0 */ 0,
++	/* 0xa1 */ 1,
++	/* 0xa2 */ 2,
++	/* 0xa3 */ 3,
++	/* 0xa4 */ 4,
++	/* 0xa5 */ 5,
++	/* 0xa6 */ 6,
++	/* 0xa7 */ 7,
++	/* 0xa8 */ 8,
++	/* 0xa9 */ 9,
++	/* 0xaa */ 10,
++	/* 0xab */ 11,
++	/* 0xac */ 12,
++	/* 0xad */ 13,
++	/* 0xae */ 14,
++	/* 0xaf */ 15,
++	/* 0xb0 */ 16,
++	/* 0xb1 */ 17,
++	/* 0xb2 */ 18,
++	/* 0xb3 */ 19,
++	/* 0xb4 */ 20,
++	/* 0xb5 */ 21,
++	/* 0xb6 */ 22,
++	/* 0xb7 */ 23,
++	/* 0xb8 */ 24,
++	/* 0xb9 */ 25,
++	/* 0xba */ 26,
++	/* 0xbb */ 27,
++	/* 0xbc */ 28,
++	/* 0xbd */ 29,
++	/* 0xbe */ 30,
++	/* 0xbf */ 31,
++	/* }}} */
++
++	/* {{{ MP_NIL, MP_BOOL */
++	/* 0xc0 */ 0, /* MP_NIL */
++	/* 0xc1 */ 0, /* never used */
++	/* 0xc2 */ 0, /* MP_BOOL*/
++	/* 0xc3 */ 0, /* MP_BOOL*/
++	/* }}} */
++
++	/* {{{ MP_BIN */
++	/* 0xc4 */ MP_HINT_STR_8,  /* MP_BIN (8)  */
++	/* 0xc5 */ MP_HINT_STR_16, /* MP_BIN (16) */
++	/* 0xc6 */ MP_HINT_STR_32, /* MP_BIN (32) */
++	/* }}} */
++
++	/* {{{ MP_EXT */
++	/* 0xc7 */ MP_HINT_EXT_8,    /* MP_EXT (8)  */
++	/* 0xc8 */ MP_HINT_EXT_16,   /* MP_EXT (16) */
++	/* 0xc9 */ MP_HINT_EXT_32,   /* MP_EXT (32) */
++	/* }}} */
++
++	/* {{{ MP_FLOAT, MP_DOUBLE */
++	/* 0xca */ sizeof(float),    /* MP_FLOAT */
++	/* 0xcb */ sizeof(double),   /* MP_DOUBLE */
++	/* }}} */
++
++	/* {{{ MP_UINT */
++	/* 0xcc */ sizeof(uint8_t),  /* MP_UINT (8)  */
++	/* 0xcd */ sizeof(uint16_t), /* MP_UINT (16) */
++	/* 0xce */ sizeof(uint32_t), /* MP_UINT (32) */
++	/* 0xcf */ sizeof(uint64_t), /* MP_UINT (64) */
++	/* }}} */
++
++	/* {{{ MP_INT */
++	/* 0xd0 */ sizeof(uint8_t),  /* MP_INT (8)  */
++	/* 0xd1 */ sizeof(uint16_t), /* MP_INT (8)  */
++	/* 0xd2 */ sizeof(uint32_t), /* MP_INT (8)  */
++	/* 0xd3 */ sizeof(uint64_t), /* MP_INT (8)  */
++	/* }}} */
++
++	/* {{{ MP_EXT (fixext) */
++	/* 0xd4 */ 2,  /* MP_EXT (fixext 8)   */
++	/* 0xd5 */ 3,  /* MP_EXT (fixext 16)  */
++	/* 0xd6 */ 5,  /* MP_EXT (fixext 32)  */
++	/* 0xd7 */ 9,  /* MP_EXT (fixext 64)  */
++	/* 0xd8 */ 17, /* MP_EXT (fixext 128) */
++	/* }}} */
++
++	/* {{{ MP_STR */
++	/* 0xd9 */ MP_HINT_STR_8,      /* MP_STR (8) */
++	/* 0xda */ MP_HINT_STR_16,     /* MP_STR (16) */
++	/* 0xdb */ MP_HINT_STR_32,     /* MP_STR (32) */
++	/* }}} */
++
++	/* {{{ MP_ARRAY */
++	/* 0xdc */ MP_HINT_ARRAY_16,   /* MP_ARRAY (16) */
++	/* 0xdd */ MP_HINT_ARRAY_32,   /* MP_ARRAY (32) */
++	/* }}} */
++
++	/* {{{ MP_MAP */
++	/* 0xde */ MP_HINT_MAP_16,     /* MP_MAP (16) */
++	/* 0xdf */ MP_HINT_MAP_32,     /* MP_MAP (32) */
++	/* }}} */
++
++	/* {{{ MP_INT (fixed) */
++	/* 0xe0 */ 0,
++	/* 0xe1 */ 0,
++	/* 0xe2 */ 0,
++	/* 0xe3 */ 0,
++	/* 0xe4 */ 0,
++	/* 0xe5 */ 0,
++	/* 0xe6 */ 0,
++	/* 0xe7 */ 0,
++	/* 0xe8 */ 0,
++	/* 0xe9 */ 0,
++	/* 0xea */ 0,
++	/* 0xeb */ 0,
++	/* 0xec */ 0,
++	/* 0xed */ 0,
++	/* 0xee */ 0,
++	/* 0xef */ 0,
++	/* 0xf0 */ 0,
++	/* 0xf1 */ 0,
++	/* 0xf2 */ 0,
++	/* 0xf3 */ 0,
++	/* 0xf4 */ 0,
++	/* 0xf5 */ 0,
++	/* 0xf6 */ 0,
++	/* 0xf7 */ 0,
++	/* 0xf8 */ 0,
++	/* 0xf9 */ 0,
++	/* 0xfa */ 0,
++	/* 0xfb */ 0,
++	/* 0xfc */ 0,
++	/* 0xfd */ 0,
++	/* 0xfe */ 0,
++	/* 0xff */ 0
++	/* }}} */
++};
++
++const char *mp_char2escape[128] = {
++	"\\u0000", "\\u0001", "\\u0002", "\\u0003",
++	"\\u0004", "\\u0005", "\\u0006", "\\u0007",
++	"\\b", "\\t", "\\n", "\\u000b",
++	"\\f", "\\r", "\\u000e", "\\u000f",
++	"\\u0010", "\\u0011", "\\u0012", "\\u0013",
++	"\\u0014", "\\u0015", "\\u0016", "\\u0017",
++	"\\u0018", "\\u0019", "\\u001a", "\\u001b",
++	"\\u001c", "\\u001d", "\\u001e", "\\u001f",
++	NULL, NULL, "\\\"", NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, "\\/",
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, "\\\\", NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, "\\u007f"
++};
++
++/*
++ * This lookup table is used by mp_encode_ext() to
++ * determine ext code (fixext 1, fixext 2, fixext 4, fixext 8,
++ * fixext 16) to encode using size.
++ */
++const uint8_t mp_ext_hint[16] = {
++	0xd4,  /*  1 */
++	0xd5,  /*  2 */
++	   0,  /*  3 */
++	0xd6,  /*  4 */
++	   0,  /*  5 */
++	   0,  /*  6 */
++	   0,  /*  7 */
++	0xd7,  /*  8 */
++	   0,  /*  9 */
++	   0,  /* 10 */
++	   0,  /* 11 */
++	   0,  /* 12 */
++	   0,  /* 13 */
++	   0,  /* 14 */
++	   0,  /* 15 */
++	0xd8   /* 16 */
++};
+diff --git a/netdissect.h b/netdissect.h
+index 6bc442fc..5f3afb4e 100644
+--- a/netdissect.h
++++ b/netdissect.h
+@@ -292,6 +292,7 @@ extern void nd_pop_all_packet_info(netdissect_options *);
+ #define PT_SOMEIP	19	/* Autosar SOME/IP Protocol */
+ #define PT_DOMAIN	20	/* Domain Name System (DNS) */
+ #define PT_QUIC		21	/* QUIC */
++#define PT_IPROTO	22	/* Tarantool binary protocol */
+ 
+ #define ND_MIN(a,b) ((a)>(b)?(b):(a))
+ #define ND_MAX(a,b) ((b)>(a)?(b):(a))
+@@ -718,6 +719,7 @@ extern void ssh_print(netdissect_options *, const u_char *, u_int);
+ extern void stp_print(netdissect_options *, const u_char *, u_int);
+ extern void sunrpc_print(netdissect_options *, const u_char *, u_int, const u_char *);
+ extern void syslog_print(netdissect_options *, const u_char *, u_int);
++extern void tarantool_print(netdissect_options *, const u_char *, u_int);
+ extern void tcp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
+ extern void telnet_print(netdissect_options *, const u_char *, u_int);
+ extern void tftp_print(netdissect_options *, const u_char *, u_int);
+diff --git a/print-tarantool.c b/print-tarantool.c
+new file mode 100644
+index 00000000..505da74c
+--- /dev/null
++++ b/print-tarantool.c
+@@ -0,0 +1,1563 @@
++/*
++ * Copyright (c) 2021 The TCPDUMP project
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ *
++ * Initial contribution by Pavel Balaev (balaev@tarantool.org).
++ */
++
++/* \summary: tarantool binary protocol printer */
++
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include "msgpuck.h"
++#include "netdissect.h"
++#include "netdissect-alloc.h"
++
++/*
++ * For information regarding tarantool binary protocol, see: 
++ * https://www.tarantool.io/en/doc/latest/dev_guide/internals/box_protocol/
++ */
++
++/* IPROTO_FLAGS bitfield constants. */
++enum {
++    IPROTO_FLAG_COMMIT = 0x01,
++    IPROTO_FLAG_WAIT_SYNC = 0x02,
++    IPROTO_FLAG_WAIT_ACK = 0x04,
++};
++
++/* IPROTO command codes */
++enum request_type {
++    IPROTO_OK = 0,
++    IPROTO_SELECT = 1,
++    IPROTO_INSERT = 2,
++    IPROTO_REPLACE = 3,
++    IPROTO_UPDATE = 4,
++    IPROTO_DELETE = 5,
++    IPROTO_CALL_16 = 6,
++    IPROTO_AUTH = 7,
++    IPROTO_EVAL = 8,
++    IPROTO_UPSERT = 9,
++    IPROTO_CALL = 10,
++    IPROTO_EXECUTE = 11,
++    IPROTO_NOP = 12,
++    IPROTO_PREPARE = 13,
++    IPROTO_BEGIN = 14,
++    IPROTO_COMMIT = 15,
++    IPROTO_ROLLBACK = 16,
++    IPROTO_TYPE_STAT_MAX,
++    IPROTO_RAFT = 30,
++    IPROTO_RAFT_PROMOTE = 31,
++    IPROTO_RAFT_DEMOTE = 32,
++    IPROTO_RAFT_CONFIRM = 40,
++    IPROTO_RAFT_ROLLBACK = 41,
++    IPROTO_PING = 64,
++    IPROTO_JOIN = 65,
++    IPROTO_SUBSCRIBE = 66,
++    IPROTO_VOTE_DEPRECATED = 67,
++    IPROTO_VOTE = 68,
++    IPROTO_FETCH_SNAPSHOT = 69,
++    IPROTO_REGISTER = 70,
++    IPROTO_JOIN_META = 71,
++    IPROTO_JOIN_SNAPSHOT = 72,
++    IPROTO_ID = 73,
++    IPROTO_WATCH = 74,
++    IPROTO_UNWATCH = 75,
++    IPROTO_EVENT = 76,
++    IPROTO_TYPE_ERROR = 1 << 15
++};
++
++enum iproto_key {
++    IPROTO_REQUEST_TYPE = 0x00,
++    IPROTO_SYNC = 0x01,
++    IPROTO_REPLICA_ID = 0x02,
++    IPROTO_LSN = 0x03,
++    IPROTO_TIMESTAMP = 0x04,
++    IPROTO_SCHEMA_VERSION = 0x05,
++    IPROTO_SERVER_VERSION = 0x06,
++    IPROTO_GROUP_ID = 0x07,
++    IPROTO_TSN = 0x08,
++    IPROTO_FLAGS = 0x09,
++    IPROTO_STREAM_ID = 0x0a,
++    IPROTO_SPACE_ID = 0x10,
++    IPROTO_INDEX_ID = 0x11,
++    IPROTO_LIMIT = 0x12,
++    IPROTO_OFFSET = 0x13,
++    IPROTO_ITERATOR = 0x14,
++    IPROTO_INDEX_BASE = 0x15,
++    IPROTO_KEY = 0x20,
++    IPROTO_TUPLE = 0x21,
++    IPROTO_FUNCTION_NAME = 0x22,
++    IPROTO_USER_NAME = 0x23,
++    IPROTO_INSTANCE_UUID = 0x24,
++    IPROTO_CLUSTER_UUID = 0x25,
++    IPROTO_VCLOCK = 0x26,
++    IPROTO_EXPR = 0x27,
++    IPROTO_OPS = 0x28,
++    IPROTO_BALLOT = 0x29,
++    IPROTO_TUPLE_META = 0x2a,
++    IPROTO_OPTIONS = 0x2b,
++    IPROTO_DATA = 0x30,
++    IPROTO_ERROR_24 = 0x31,
++    IPROTO_METADATA = 0x32,
++    IPROTO_BIND_METADATA = 0x33,
++    IPROTO_BIND_COUNT = 0x34,
++    IPROTO_SQL_TEXT = 0x40,
++    IPROTO_SQL_BIND = 0x41,
++    IPROTO_SQL_INFO = 0x42,
++    IPROTO_STMT_ID = 0x43,
++    IPROTO_REPLICA_ANON = 0x50,
++    IPROTO_ID_FILTER = 0x51,
++    IPROTO_ERROR = 0x52,
++    IPROTO_TERM = 0x53,
++    IPROTO_VERSION = 0x54,
++    IPROTO_FEATURES = 0x55,
++    IPROTO_TIMEOUT = 0x56,
++    IPROTO_EVENT_KEY = 0x57,
++    IPROTO_EVENT_DATA = 0x58,
++    IPROTO_KEY_MAX
++};
++
++enum iproto_metadata_key {
++    IPROTO_FIELD_NAME = 0,
++    IPROTO_FIELD_TYPE = 1,
++    IPROTO_FIELD_COLL = 2,
++    IPROTO_FIELD_IS_NULLABLE = 3,
++    IPROTO_FIELD_IS_AUTOINCREMENT = 4,
++    IPROTO_FIELD_SPAN = 5,
++};
++
++enum iproto_ballot_key {
++    IPROTO_BALLOT_IS_RO_CFG = 0x01,
++    IPROTO_BALLOT_VCLOCK = 0x02,
++    IPROTO_BALLOT_GC_VCLOCK = 0x03,
++    IPROTO_BALLOT_IS_RO = 0x04,
++    IPROTO_BALLOT_IS_ANON = 0x05,
++    IPROTO_BALLOT_IS_BOOTED = 0x06,
++    IPROTO_BALLOT_CAN_LEAD = 0x07,
++};
++
++enum iproto_raft_keys {
++    IPROTO_RAFT_TERM = 0,
++    IPROTO_RAFT_VOTE = 1,
++    IPROTO_RAFT_STATE = 2,
++    IPROTO_RAFT_VCLOCK = 3,
++};
++
++static const char *iterator_type[] = {
++    "EQ", "REQ", "ALL", "LT", "LE", "GE", "GT",
++    "BITS_ALL_SET", "BITS_ANY_SET", "BITS_ALL_NOT_SET",
++    "OVERLAPS", "NEIGHBOR"
++};
++
++static const char *error_codes[] = {
++    "ER_UNKNOWN",
++    "ER_ILLEGAL_PARAMS",
++    "ER_MEMORY_ISSUE",
++    "ER_TUPLE_FOUND",
++    "ER_TUPLE_NOT_FOUND",
++    "ER_UNSUPPORTED",
++    "ER_NONMASTER",
++    "ER_READONLY",
++    "ER_INJECTION",
++    "ER_CREATE_SPACE",
++    "ER_SPACE_EXISTS",
++    "ER_DROP_SPACE",
++    "ER_ALTER_SPACE",
++    "ER_INDEX_TYPE",
++    "ER_MODIFY_INDEX",
++    "ER_LAST_DROP",
++    "ER_TUPLE_FORMAT_LIMIT",
++    "ER_DROP_PRIMARY_KEY",
++    "ER_KEY_PART_TYPE",
++    "ER_EXACT_MATCH",
++    "ER_INVALID_MSGPACK",
++    "ER_PROC_RET",
++    "ER_TUPLE_NOT_ARRAY",
++    "ER_FIELD_TYPE",
++    "ER_INDEX_PART_TYPE_MISMATCH",
++    "ER_UPDATE_SPLICE",
++    "ER_UPDATE_ARG_TYPE",
++    "ER_FORMAT_MISMATCH_INDEX_PART",
++    "ER_UNKNOWN_UPDATE_OP",
++    "ER_UPDATE_FIELD",
++    "ER_FUNCTION_TX_ACTIVE",
++    "ER_KEY_PART_COUNT",
++    "ER_PROC_LUA",
++    "ER_NO_SUCH_PROC",
++    "ER_NO_SUCH_TRIGGER",
++    "ER_NO_SUCH_INDEX_ID",
++    "ER_NO_SUCH_SPACE",
++    "ER_NO_SUCH_FIELD_NO",
++    "ER_EXACT_FIELD_COUNT",
++    "ER_FIELD_MISSING",
++    "ER_WAL_IO",
++    "ER_MORE_THAN_ONE_TUPLE",
++    "ER_ACCESS_DENIED",
++    "ER_CREATE_USER",
++    "ER_DROP_USER",
++    "ER_NO_SUCH_USER",
++    "ER_USER_EXISTS",
++    "ER_PASSWORD_MISMATCH",
++    "ER_UNKNOWN_REQUEST_TYPE",
++    "ER_UNKNOWN_SCHEMA_OBJECT",
++    "ER_CREATE_FUNCTION",
++    "ER_NO_SUCH_FUNCTION",
++    "ER_FUNCTION_EXISTS",
++    "ER_BEFORE_REPLACE_RET",
++    "ER_MULTISTATEMENT_TRANSACTION",
++    "ER_TRIGGER_EXISTS",
++    "ER_USER_MAX",
++    "ER_NO_SUCH_ENGINE",
++    "ER_RELOAD_CFG",
++    "ER_CFG",
++    "ER_SAVEPOINT_EMPTY_TX",
++    "ER_NO_SUCH_SAVEPOINT",
++    "ER_UNKNOWN_REPLICA",
++    "ER_REPLICASET_UUID_MISMATCH",
++    "ER_INVALID_UUID",
++    "ER_REPLICASET_UUID_IS_RO",
++    "ER_INSTANCE_UUID_MISMATCH",
++    "ER_REPLICA_ID_IS_RESERVED",
++    "ER_INVALID_ORDER",
++    "ER_MISSING_REQUEST_FIELD",
++    "ER_IDENTIFIER",
++    "ER_DROP_FUNCTION",
++    "ER_ITERATOR_TYPE",
++    "ER_REPLICA_MAX",
++    "ER_INVALID_XLOG",
++    "ER_INVALID_XLOG_NAME",
++    "ER_INVALID_XLOG_ORDER",
++    "ER_NO_CONNECTION",
++    "ER_TIMEOUT",
++    "ER_ACTIVE_TRANSACTION",
++    "ER_CURSOR_NO_TRANSACTION",
++    "ER_CROSS_ENGINE_TRANSACTION",
++    "ER_NO_SUCH_ROLE",
++    "ER_ROLE_EXISTS",
++    "ER_CREATE_ROLE",
++    "ER_INDEX_EXISTS",
++    "ER_SESSION_CLOSED",
++    "ER_ROLE_LOOP",
++    "ER_GRANT",
++    "ER_PRIV_GRANTED",
++    "ER_ROLE_GRANTED",
++    "ER_PRIV_NOT_GRANTED",
++    "ER_ROLE_NOT_GRANTED",
++    "ER_MISSING_SNAPSHOT",
++    "ER_CANT_UPDATE_PRIMARY_KEY",
++    "ER_UPDATE_INTEGER_OVERFLOW",
++    "ER_GUEST_USER_PASSWORD",
++    "ER_TRANSACTION_CONFLICT",
++    "ER_UNSUPPORTED_PRIV",
++    "ER_LOAD_FUNCTION",
++    "ER_FUNCTION_LANGUAGE",
++    "ER_RTREE_RECT",
++    "ER_PROC_C",
++    "ER_UNKNOWN_RTREE_INDEX_DISTANCE_TYPE",
++    "ER_PROTOCOL",
++    "ER_UPSERT_UNIQUE_SECONDARY_KEY",
++    "ER_WRONG_INDEX_RECORD",
++    "ER_WRONG_INDEX_PARTS",
++    "ER_WRONG_INDEX_OPTIONS",
++    "ER_WRONG_SCHEMA_VERSION",
++    "ER_MEMTX_MAX_TUPLE_SIZE",
++    "ER_WRONG_SPACE_OPTIONS",
++    "ER_UNSUPPORTED_INDEX_FEATURE",
++    "ER_VIEW_IS_RO",
++    "ER_NO_TRANSACTION",
++    "ER_SYSTEM",
++    "ER_LOADING",
++    "ER_CONNECTION_TO_SELF",
++    "ER_KEY_PART_IS_TOO_LONG",
++    "ER_COMPRESSION",
++    "ER_CHECKPOINT_IN_PROGRESS",
++    "ER_SUB_STMT_MAX",
++    "ER_COMMIT_IN_SUB_STMT",
++    "ER_ROLLBACK_IN_SUB_STMT",
++    "ER_DECOMPRESSION",
++    "ER_INVALID_XLOG_TYPE",
++    "ER_ALREADY_RUNNING",
++    "ER_INDEX_FIELD_COUNT_LIMIT",
++    "ER_LOCAL_INSTANCE_ID_IS_READ_ONLY",
++    "ER_BACKUP_IN_PROGRESS",
++    "ER_READ_VIEW_ABORTED",
++    "ER_INVALID_INDEX_FILE",
++    "ER_INVALID_RUN_FILE",
++    "ER_INVALID_VYLOG_FILE",
++    "ER_CASCADE_ROLLBACK",
++    "ER_VY_QUOTA_TIMEOUT",
++    "ER_PARTIAL_KEY",
++    "ER_TRUNCATE_SYSTEM_SPACE",
++    "ER_LOAD_MODULE",
++    "ER_VINYL_MAX_TUPLE_SIZE",
++    "ER_WRONG_DD_VERSION",
++    "ER_WRONG_SPACE_FORMAT",
++    "ER_CREATE_SEQUENCE",
++    "ER_ALTER_SEQUENCE",
++    "ER_DROP_SEQUENCE",
++    "ER_NO_SUCH_SEQUENCE",
++    "ER_SEQUENCE_EXISTS",
++    "ER_SEQUENCE_OVERFLOW",
++    "ER_NO_SUCH_INDEX_NAME",
++    "ER_SPACE_FIELD_IS_DUPLICATE",
++    "ER_CANT_CREATE_COLLATION",
++    "ER_WRONG_COLLATION_OPTIONS",
++    "ER_NULLABLE_PRIMARY",
++    "ER_NO_SUCH_FIELD_NAME_IN_SPACE",
++    "ER_TRANSACTION_YIELD",
++    "ER_NO_SUCH_GROUP",
++    "ER_SQL_BIND_VALUE",
++    "ER_SQL_BIND_TYPE",
++    "ER_SQL_BIND_PARAMETER_MAX",
++    "ER_SQL_EXECUTE",
++    "ER_UPDATE_DECIMAL_OVERFLOW",
++    "ER_SQL_BIND_NOT_FOUND",
++    "ER_ACTION_MISMATCH",
++    "ER_VIEW_MISSING_SQL",
++    "ER_FOREIGN_KEY_CONSTRAINT",
++    "ER_NO_SUCH_MODULE",
++    "ER_NO_SUCH_COLLATION",
++    "ER_CREATE_FK_CONSTRAINT",
++    "ER_DROP_FK_CONSTRAINT",
++    "ER_NO_SUCH_CONSTRAINT",
++    "ER_CONSTRAINT_EXISTS",
++    "ER_SQL_TYPE_MISMATCH",
++    "ER_ROWID_OVERFLOW",
++    "ER_DROP_COLLATION",
++    "ER_ILLEGAL_COLLATION_MIX",
++    "ER_SQL_NO_SUCH_PRAGMA",
++    "ER_SQL_CANT_RESOLVE_FIELD",
++    "ER_INDEX_EXISTS_IN_SPACE",
++    "ER_INCONSISTENT_TYPES",
++    "ER_SQL_SYNTAX_WITH_POS",
++    "ER_SQL_STACK_OVERFLOW",
++    "ER_SQL_SELECT_WILDCARD",
++    "ER_SQL_STATEMENT_EMPTY",
++    "ER_SQL_KEYWORD_IS_RESERVED",
++    "ER_SQL_SYNTAX_NEAR_TOKEN",
++    "ER_SQL_UNKNOWN_TOKEN",
++    "ER_SQL_PARSER_GENERIC",
++    "ER_SQL_ANALYZE_ARGUMENT",
++    "ER_SQL_COLUMN_COUNT_MAX",
++    "ER_HEX_LITERAL_MAX",
++    "ER_INT_LITERAL_MAX",
++    "ER_SQL_PARSER_LIMIT",
++    "ER_INDEX_DEF_UNSUPPORTED",
++    "ER_CK_DEF_UNSUPPORTED",
++    "ER_MULTIKEY_INDEX_MISMATCH",
++    "ER_CREATE_CK_CONSTRAINT",
++    "ER_CK_CONSTRAINT_FAILED",
++    "ER_SQL_COLUMN_COUNT",
++    "ER_FUNC_INDEX_FUNC",
++    "ER_FUNC_INDEX_FORMAT",
++    "ER_FUNC_INDEX_PARTS",
++    "ER_NO_SUCH_FIELD_NAME",
++    "ER_FUNC_WRONG_ARG_COUNT",
++    "ER_BOOTSTRAP_READONLY",
++    "ER_SQL_FUNC_WRONG_RET_COUNT",
++    "ER_FUNC_INVALID_RETURN_TYPE",
++    "ER_SQL_PARSER_GENERIC_WITH_POS",
++    "ER_REPLICA_NOT_ANON",
++    "ER_CANNOT_REGISTER",
++    "ER_SESSION_SETTING_INVALID_VALUE",
++    "ER_SQL_PREPARE",
++    "ER_WRONG_QUERY_ID",
++    "ER_SEQUENCE_NOT_STARTED",
++    "ER_NO_SUCH_SESSION_SETTING",
++    "ER_UNCOMMITTED_FOREIGN_SYNC_TXNS",
++    "ER_SYNC_MASTER_MISMATCH",
++    "ER_SYNC_QUORUM_TIMEOUT",
++    "ER_SYNC_ROLLBACK",
++    "ER_TUPLE_METADATA_IS_TOO_BIG",
++    "ER_XLOG_GAP",
++    "ER_TOO_EARLY_SUBSCRIBE",
++    "ER_SQL_CANT_ADD_AUTOINC",
++    "ER_QUORUM_WAIT",
++    "ER_INTERFERING_PROMOTE",
++    "ER_ELECTION_DISABLED",
++    "ER_TXN_ROLLBACK",
++    "ER_NOT_LEADER",
++    "ER_SYNC_QUEUE_UNCLAIMED",
++    "ER_SYNC_QUEUE_FOREIGN",
++    "ER_UNABLE_TO_PROCESS_IN_STREAM",
++    "ER_UNABLE_TO_PROCESS_OUT_OF_STREAM",
++    "ER_TRANSACTION_TIMEOUT",
++    "ER_ACTIVE_TIMER",
++    "ER_TUPLE_FIELD_COUNT_LIMIT"
++};
++
++enum error_keys {
++    MP_ERROR_TYPE = 0x00,
++    MP_ERROR_FILE = 0x01,
++    MP_ERROR_LINE = 0x02,
++    MP_ERROR_MESSAGE = 0x03,
++    MP_ERROR_ERRNO = 0x04,
++    MP_ERROR_CODE = 0x05,
++    MP_ERROR_FIELDS = 0x06,
++};
++
++enum system_space_id {
++    BOX_VINYL_DEFERRED_DELETE_ID = 257,
++    BOX_SCHEMA_ID = 272,
++    BOX_COLLATION_ID = 276,
++    BOX_VCOLLATION_ID = 277,
++    BOX_SPACE_ID = 280,
++    BOX_VSPACE_ID = 281,
++    BOX_SEQUENCE_ID = 284,
++    BOX_SEQUENCE_DATA_ID = 285,
++    BOX_VSEQUENCE_ID = 286,
++    BOX_INDEX_ID = 288,
++    BOX_VINDEX_ID = 289,
++    BOX_FUNC_ID = 296,
++    BOX_VFUNC_ID = 297,
++    BOX_USER_ID = 304,
++    BOX_VUSER_ID = 305,
++    BOX_PRIV_ID = 312,
++    BOX_VPRIV_ID = 313,
++    BOX_CLUSTER_ID = 320,
++    BOX_TRIGGER_ID = 328,
++    BOX_TRUNCATE_ID = 330,
++    BOX_SPACE_SEQUENCE_ID = 340,
++    BOX_FK_CONSTRAINT_ID = 356,
++    BOX_CK_CONSTRAINT_ID = 364,
++    BOX_FUNC_INDEX_ID = 372,
++    BOX_SESSION_SETTINGS_ID = 380,
++    BOX_SYSTEM_ID_MAX = 511,
++};
++
++/* must be sorted by id */
++static struct space {
++    enum system_space_id id;
++    const char *name;
++} system_spaces[] = {
++    { BOX_VINYL_DEFERRED_DELETE_ID, "_vinyl_deferred_delete" },
++    { BOX_SCHEMA_ID,                "_schema"                },
++    { BOX_COLLATION_ID,             "_collation"             },
++    { BOX_VCOLLATION_ID,            "_vcollation"            },
++    { BOX_SPACE_ID,                 "_space"                 },
++    { BOX_VSPACE_ID,                "_vspace"                },
++    { BOX_SEQUENCE_ID,              "_sequence"              },
++    { BOX_SEQUENCE_DATA_ID,         "_sequence_data"         },
++    { BOX_VSEQUENCE_ID,             "_vsequence"             },
++    { BOX_INDEX_ID,                 "_index"                 },
++    { BOX_VINDEX_ID,                "_vindex"                },
++    { BOX_FUNC_ID,                  "_func"                  },
++    { BOX_VFUNC_ID,                 "_vfunc"                 },
++    { BOX_USER_ID,                  "_user"                  },
++    { BOX_VUSER_ID,                 "_vuser"                 },
++    { BOX_PRIV_ID,                  "_priv"                  },
++    { BOX_VPRIV_ID,                 "_vpriv"                 },
++    { BOX_CLUSTER_ID,               "_cluster"               },
++    { BOX_TRIGGER_ID,               "_trigger"               },
++    { BOX_TRUNCATE_ID,              "_truncate"              },
++    { BOX_SPACE_SEQUENCE_ID,        "_space_sequence"        },
++    { BOX_FK_CONSTRAINT_ID,         "_fk_constraint"         },
++    { BOX_CK_CONSTRAINT_ID,         "_ck_constraint"         },
++    { BOX_FUNC_INDEX_ID,            "_func_index"            },
++    { BOX_SESSION_SETTINGS_ID,      "_session_settings"      }
++};
++
++static int space_compar(const void *s1, const void *s2)
++{
++    const struct space *sp1 = s1;
++    const struct space *sp2 = s2;
++
++    if (sp1->id == sp2->id) {
++        return 0;
++    }
++
++    return (sp1->id < sp2->id) ? -1 : 1;
++}
++
++#define TIME_BUF_LEN 32
++/* timestamp returns from libev by ev_now() in double data */
++const char *get_time(netdissect_options *ndo, double ts)
++{
++    char buf[10] = {0};
++    struct tm time;
++    time_t t = ts;
++    char *res, *p;
++    double fract;
++    size_t len;
++
++    if ((localtime_r(&t, &time)) != &time) {
++        return NULL;
++    }
++
++    if ((res = nd_malloc(ndo, TIME_BUF_LEN)) == NULL) {
++        return NULL;
++    }
++    p = res;
++    memset(res, 0, TIME_BUF_LEN);
++
++    if (!strftime(res, TIME_BUF_LEN, "%Y-%m-%d %H:%M:%S", &time)) {
++        return NULL;
++    }
++
++    len = strlen(res);
++    p += len;
++    fract = ts - t;
++    snprintf(buf, sizeof(buf), "%lf", fract);
++    snprintf(p, TIME_BUF_LEN - len, "%s", buf + 1);
++
++    return res;
++}
++
++#define GR_NAME "Tarantool"
++#define GR_MAXLEN 64
++#define ARR_LEN(p) (sizeof(p) / sizeof((p)[0]))
++#define ND_PRINT_ERR_MPTYPE() (ndo->ndo_printf)(ndo, " unexpected MsgPack type")
++
++typedef struct {
++    uint64_t key;
++    union {
++        uint64_t val;
++        double val_d;
++    };
++} kv_t;
++
++#define GEN_REQ(req) \
++    static void parse_ ## req(netdissect_options *ndo, const char *msg, \
++            const kv_t *kv, size_t kv_len);
++
++#define GEN_REQ_FUNC(req, name) \
++static void parse_ ## req(netdissect_options *ndo, const char *msg, \
++        const kv_t *kv, size_t kv_len)                              \
++{                                                                   \
++    double timestamp = 0;                                           \
++    uint64_t sync = 0, lsn = 0, rid = 0, flags = 0;                 \
++                                                                    \
++    for (size_t n = 0; n < kv_len; n++) {                           \
++        switch(kv[n].key) {                                         \
++        case IPROTO_SYNC:                                           \
++            sync = kv[n].val;                                       \
++            break;                                                  \
++        case IPROTO_LSN:                                            \
++            lsn = kv[n].val;                                        \
++            break;                                                  \
++        case IPROTO_REPLICA_ID:                                     \
++            rid = kv[n].val;                                        \
++            break;                                                  \
++        case IPROTO_FLAGS:                                          \
++            flags = kv[n].val;                                      \
++            break;                                                  \
++        case IPROTO_TIMESTAMP:                                      \
++            timestamp = kv[n].val_d;                                \
++            break;                                                  \
++        }                                                           \
++    }                                                               \
++                                                                    \
++    ND_PRINT(" request: %s, SYNC: %lu", #name, sync);               \
++    if (rid) {                                                      \
++        ND_PRINT(", REPLICA_ID: %lu", rid);                         \
++    }                                                               \
++    if (lsn) {                                                      \
++        ND_PRINT(", LSN: %lu", lsn);                                \
++    }                                                               \
++    if (timestamp) {                                                \
++        const char *time = get_time(ndo, timestamp);                \
++        ND_PRINT(", TIMESTAMP: %s", (time) ? time : "NULL");        \
++    }                                                               \
++    if (flags) {                                                    \
++        ND_PRINT(", FLAGS: %lu", flags);                            \
++    }                                                               \
++                                                                    \
++    if (ndo->ndo_vflag == 0) {                                      \
++        return;                                                     \
++    }                                                               \
++                                                                    \
++    parse_body(ndo, msg);                                           \
++}
++
++#define GEN_NOBODY_REQ_FUNC(req, name) \
++static void parse_ ## req(netdissect_options *ndo, const char *msg, \
++        const kv_t *kv, size_t kv_len)                              \
++{                                                                   \
++    uint64_t sync = 0;                                              \
++                                                                    \
++    for (size_t n = 0; n < kv_len; n++) {                           \
++        switch(kv[n].key) {                                         \
++        case IPROTO_SYNC:                                           \
++            sync = kv[n].val;                                       \
++            break;                                                  \
++        }                                                           \
++    }                                                               \
++                                                                    \
++    ND_PRINT(" request: %s, SYNC: %lu", #name, sync);               \
++}
++
++#define GEN_TRANS_REQ_FUNC(req, name) \
++static void parse_ ## req(netdissect_options *ndo, const char *msg,       \
++        const kv_t *kv, size_t kv_len)                                    \
++{                                                                         \
++    uint64_t sync, id;                                                    \
++                                                                          \
++    sync = id = 0;                                                        \
++                                                                          \
++    for (size_t n = 0; n < kv_len; n++) {                                 \
++        switch(kv[n].key) {                                               \
++        case IPROTO_SYNC:                                                 \
++            sync = kv[n].val;                                             \
++            break;                                                        \
++        case IPROTO_STREAM_ID:                                            \
++            id = kv[n].val;                                               \
++            break;                                                        \
++        default:                                                          \
++            goto out;                                                     \
++        }                                                                 \
++    }                                                                     \
++                                                                          \
++    ND_PRINT(" request: %s, STREAM_ID: %lu, SYNC: %lu", #name, id, sync); \
++                                                                          \
++    return;                                                               \
++out:                                                                      \
++    nd_print_invalid(ndo);                                                \
++}
++
++typedef void (*request_print_t)(netdissect_options *ndo, const char *msg,
++        const kv_t *kv, size_t kv_len);
++
++GEN_REQ(ok)
++GEN_REQ(id)
++GEN_REQ(eval)
++GEN_REQ(ping)
++GEN_REQ(select)
++GEN_REQ(insert)
++GEN_REQ(update)
++GEN_REQ(replace)
++GEN_REQ(delete)
++GEN_REQ(call)
++GEN_REQ(auth)
++GEN_REQ(upsert)
++GEN_REQ(execute)
++GEN_REQ(nop)
++GEN_REQ(prepare)
++GEN_REQ(begin)
++GEN_REQ(commit)
++GEN_REQ(rollback)
++GEN_REQ(vote)
++GEN_REQ(join)
++GEN_REQ(subscribe)
++GEN_REQ(join_meta)
++GEN_REQ(join_snapshot)
++GEN_REQ(raft)
++GEN_REQ(raft_promote)
++GEN_REQ(raft_confirm)
++GEN_REQ(error)
++
++#define CASE_IPROTO_STR(param)                      \
++    case IPROTO_ ## param:                          \
++        {                                           \
++            const char *func;                       \
++                                                    \
++            if (mp_typeof(*msg) != MP_STR) {        \
++                ND_PRINT_ERR_MPTYPE();              \
++                goto out;                           \
++            }                                       \
++                                                    \
++            func = get_string(ndo, msg);            \
++            if (func) {                             \
++                ND_PRINT("\n%s: %s", #param, func); \
++            }                                       \
++            mp_next(&msg);                          \
++        }                                           \
++        break;
++
++#define CASE_IPROTO_UINT(param)                              \
++    case IPROTO_ ## param:                                   \
++        if (mp_typeof(*msg) != MP_UINT) {                    \
++            ND_PRINT_ERR_MPTYPE();                           \
++            goto out;                                        \
++        }                                                    \
++        ND_PRINT("\n%s: %lu", #param, mp_decode_uint(&msg)); \
++        break;
++
++#define CASE_IPROTO_ARRAY(param)                          \
++    case IPROTO_ ## param:                                \
++        if (mp_typeof(*msg) != MP_ARRAY) {                \
++            ND_PRINT_ERR_MPTYPE();                        \
++            goto out;                                     \
++        }                                                 \
++                                                          \
++        ND_PRINT("\n%s: %s", #param, get_json(ndo, msg)); \
++        mp_next(&msg);                                    \
++        break;                                            \
++
++#define CASE_IPROTO_MAP(param)                            \
++    case IPROTO_ ## param:                                \
++        if (mp_typeof(*msg) != MP_MAP) {                  \
++            ND_PRINT_ERR_MPTYPE();                        \
++            goto out;                                     \
++        }                                                 \
++        ND_PRINT("\n%s: %s", #param, get_json(ndo, msg)); \
++        mp_next(&msg);                                    \
++        break;
++
++#define CASE_IPROTO_BOOL(param)                           \
++    case IPROTO_ ## param:                                \
++        if (mp_typeof(*msg) != MP_BOOL) {                 \
++            ND_PRINT_ERR_MPTYPE();                        \
++            goto out;                                     \
++        }                                                 \
++        ND_PRINT("\n%s: %s", #param,                      \
++                mp_decode_bool(&msg) ? "true" : "false"); \
++        break;
++
++/* must be sorted by type */
++static struct request {
++    enum request_type type;
++    request_print_t print;
++} request_ops[] = {
++    { .type = IPROTO_OK,            .print = parse_ok            },
++    { .type = IPROTO_SELECT,        .print = parse_select        },
++    { .type = IPROTO_INSERT,        .print = parse_insert        },
++    { .type = IPROTO_REPLACE,       .print = parse_replace       },
++    { .type = IPROTO_UPDATE,        .print = parse_update        },
++    { .type = IPROTO_DELETE,        .print = parse_delete        },
++    { .type = IPROTO_CALL_16,       .print = parse_call          },
++    { .type = IPROTO_AUTH,          .print = parse_auth          },
++    { .type = IPROTO_EVAL,          .print = parse_eval          },
++    { .type = IPROTO_UPSERT,        .print = parse_upsert        },
++    { .type = IPROTO_CALL,          .print = parse_call          },
++    { .type = IPROTO_EXECUTE,       .print = parse_execute       },
++    { .type = IPROTO_NOP,           .print = parse_nop           },
++    { .type = IPROTO_PREPARE,       .print = parse_prepare       },
++    { .type = IPROTO_BEGIN,         .print = parse_begin         },
++    { .type = IPROTO_COMMIT,        .print = parse_commit        },
++    { .type = IPROTO_ROLLBACK,      .print = parse_rollback      },
++    { .type = IPROTO_RAFT,          .print = parse_raft          },
++    { .type = IPROTO_RAFT_PROMOTE,  .print = parse_raft_promote  },
++    { .type = IPROTO_RAFT_CONFIRM,  .print = parse_raft_confirm  },
++    { .type = IPROTO_PING,          .print = parse_ping          },
++    { .type = IPROTO_JOIN,          .print = parse_join          },
++    { .type = IPROTO_SUBSCRIBE,     .print = parse_subscribe     },
++    { .type = IPROTO_VOTE,          .print = parse_vote          },
++    { .type = IPROTO_JOIN_META,     .print = parse_join_meta     },
++    { .type = IPROTO_JOIN_SNAPSHOT, .print = parse_join_snapshot },
++    { .type = IPROTO_ID,            .print = parse_id            },
++    { .type = IPROTO_TYPE_ERROR,    .print = parse_error         }
++};
++
++static int request_compar(const void *r1, const void *r2)
++{
++    const struct request *re1 = r1;
++    const struct request *re2 = r2;
++
++    if (re1->type == re2->type) {
++        return 0;
++    }
++
++    return (re1->type < re2->type) ? -1 : 1;
++}
++
++static char *get_json(netdissect_options *ndo, const char *msg)
++{
++    int len = mp_snprint(NULL, 0, msg);
++    char *json;
++
++    if (len > 0) {
++        len++;
++
++        json = nd_malloc(ndo, len);
++        if (!json) {
++            return NULL;
++        }
++        mp_snprint(json, len, msg);
++    }
++
++    return json;
++}
++
++static char *get_string(netdissect_options *ndo, const char *msg)
++{
++    const char *str;
++    uint32_t len;
++    char *res;
++
++    str = mp_decode_str(&msg, &len);
++    res = (char *)nd_malloc(ndo, len + 1);
++    if (!res) {
++        return NULL;
++    }
++    memcpy(res, str, len);
++    res[len] = '\0';
++
++    return res;
++}
++
++static void parse_body(netdissect_options *ndo, const char *msg)
++{
++    uint32_t body_items;
++
++    if (mp_typeof(*msg) != MP_MAP) {
++        ND_PRINT_ERR_MPTYPE();
++        goto out;
++    }
++
++    body_items = mp_decode_map(&msg);
++
++    for (uint32_t n = 0; n < body_items; n++) {
++        uint64_t key;
++
++        if (mp_typeof(*msg) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        key = mp_decode_uint(&msg);
++        switch(key) {
++        case IPROTO_SPACE_ID:
++            {
++                uint64_t sid;
++
++                if (mp_typeof(*msg) != MP_UINT) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                sid = mp_decode_uint(&msg);
++                if (sid >= BOX_SYSTEM_ID_MAX) {
++                    ND_PRINT("\nSPACE_ID: %lu", sid);
++                } else {
++                    struct space sp = { .id = sid };
++                    struct space *res;
++
++                    res = bsearch(&sp, system_spaces, ARR_LEN(system_spaces),
++                            sizeof(struct space), space_compar);
++                    if (res) {
++                        ND_PRINT("\nSPACE: %s (ID: %lu)", res->name, sid);
++                    } else {
++                        ND_PRINT("\nSPACE_ID: %lu", sid);
++                    }
++                }
++            }
++            break;
++        case IPROTO_ITERATOR:
++            {
++                uint64_t it;
++
++                if (mp_typeof(*msg) != MP_UINT) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                it = mp_decode_uint(&msg);
++
++                ND_PRINT("\nITERATOR: %s", (it >= ARR_LEN(iterator_type)) ?
++                        "unknown" : iterator_type[it]);
++            }
++            break;
++        case IPROTO_BALLOT:
++            {
++                uint32_t ballot_items;
++
++                if (mp_typeof(*msg) != MP_MAP) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                ballot_items = mp_decode_map(&msg);
++                if (ballot_items) {
++                    ND_PRINT("\n[BALLOT]");
++                }
++                for (uint32_t b = 0; b < ballot_items; b++) {
++                    uint64_t bkey;
++
++                    if (mp_typeof(*msg) != MP_UINT) {
++                        ND_PRINT_ERR_MPTYPE();
++                        goto out;
++                    }
++
++                    bkey = mp_decode_uint(&msg);
++                    switch(bkey) {
++                        CASE_IPROTO_BOOL(BALLOT_IS_RO_CFG);
++                        CASE_IPROTO_BOOL(BALLOT_IS_RO);
++                        CASE_IPROTO_BOOL(BALLOT_IS_ANON);
++                        CASE_IPROTO_BOOL(BALLOT_IS_BOOTED);
++                        CASE_IPROTO_BOOL(BALLOT_CAN_LEAD);
++                        CASE_IPROTO_MAP(BALLOT_VCLOCK);
++                        CASE_IPROTO_MAP(BALLOT_GC_VCLOCK);
++                    }
++                }
++            }
++            break;
++        CASE_IPROTO_STR(INSTANCE_UUID);
++        CASE_IPROTO_STR(CLUSTER_UUID);
++        CASE_IPROTO_STR(FUNCTION_NAME);
++        CASE_IPROTO_STR(USER_NAME);
++        CASE_IPROTO_STR(SQL_TEXT);
++        CASE_IPROTO_STR(EXPR);
++        CASE_IPROTO_MAP(VCLOCK);
++        CASE_IPROTO_UINT(SERVER_VERSION);
++        CASE_IPROTO_UINT(VERSION);
++        CASE_IPROTO_UINT(BIND_COUNT);
++        CASE_IPROTO_UINT(INDEX_ID);
++        CASE_IPROTO_UINT(INDEX_BASE);
++        CASE_IPROTO_UINT(STMT_ID);
++        CASE_IPROTO_UINT(OFFSET);
++        CASE_IPROTO_UINT(LIMIT);
++        CASE_IPROTO_UINT(REPLICA_ID);
++        CASE_IPROTO_UINT(LSN);
++        CASE_IPROTO_UINT(TERM);
++        CASE_IPROTO_BOOL(REPLICA_ANON);
++        CASE_IPROTO_ARRAY(FEATURES);
++        CASE_IPROTO_ARRAY(METADATA);
++        CASE_IPROTO_ARRAY(BIND_METADATA);
++        CASE_IPROTO_ARRAY(DATA);
++        CASE_IPROTO_ARRAY(KEY);
++        CASE_IPROTO_ARRAY(TUPLE);
++        CASE_IPROTO_ARRAY(OPS);
++        CASE_IPROTO_ARRAY(OPTIONS);
++        CASE_IPROTO_ARRAY(SQL_BIND);
++        CASE_IPROTO_ARRAY(ID_FILTER);
++        default:
++            ND_PRINT("\n_UNKNOWN_");
++            mp_next(&msg);
++        }
++    }
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
++
++GEN_REQ_FUNC(prepare, PREPARE);
++GEN_REQ_FUNC(call, CALL);
++GEN_REQ_FUNC(id, ID);
++GEN_REQ_FUNC(delete, DELETE);
++GEN_REQ_FUNC(replace, REPLACE);
++GEN_REQ_FUNC(upsert, UPSERT);
++GEN_REQ_FUNC(update, UPDATE);
++GEN_REQ_FUNC(auth, AUTH);
++GEN_REQ_FUNC(execute, EXECUTE);
++GEN_REQ_FUNC(insert, INSERT);
++GEN_REQ_FUNC(select, SELECT);
++GEN_REQ_FUNC(eval, EVAL);
++GEN_REQ_FUNC(join, JOIN);
++GEN_REQ_FUNC(subscribe, SUBSCRIBE);
++GEN_REQ_FUNC(join_meta, JOIN_META);
++GEN_REQ_FUNC(raft_promote, RAFT_PROMOTE);
++GEN_REQ_FUNC(raft_confirm, RAFT_CONFIRM);
++GEN_NOBODY_REQ_FUNC(ping, PING);
++GEN_NOBODY_REQ_FUNC(nop, NOP);
++GEN_NOBODY_REQ_FUNC(join_snapshot, JOIN_SNAPSHOT);
++GEN_TRANS_REQ_FUNC(begin, BEGIN);
++GEN_TRANS_REQ_FUNC(commit, COMMIT);
++GEN_TRANS_REQ_FUNC(rollback, ROLLBACK);
++
++static void parse_heartbeat(netdissect_options *ndo, const char *msg)
++{
++    uint32_t body_items;
++    bool heartbeat_resp = false;
++
++    if (mp_typeof(*msg) != MP_MAP) {
++        ND_PRINT_ERR_MPTYPE();
++        goto out;
++    }
++
++    body_items = mp_decode_map(&msg);
++
++    for (uint32_t n = 0; n < body_items; n++) {
++        uint64_t key;
++
++        if (mp_typeof(*msg) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        key = mp_decode_uint(&msg);
++        switch(key) {
++        case IPROTO_VCLOCK:
++            if (mp_typeof(*msg) != MP_MAP) {
++                ND_PRINT_ERR_MPTYPE();
++                goto out;
++            }
++
++            heartbeat_resp = true;
++            break;
++        }
++    }
++
++    if (heartbeat_resp) {
++        ND_PRINT(" response: HEARTBEAT\nVCLOCK: %s", get_json(ndo, msg));
++    }
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
++
++static void parse_ok(netdissect_options *ndo, const char *msg,
++        const kv_t *kv, size_t kv_len)
++{
++    uint64_t sync, version, key, replica_id;
++    double timestamp = 0;
++    uint32_t body_items;
++    enum mp_type type;
++
++    sync = version = key = replica_id = 0;
++
++    if (!kv_len) { /* may be a heartbeat response */
++        parse_heartbeat(ndo, msg);
++        return;
++    }
++
++    for (size_t n = 0; n < kv_len; n++) {
++        switch(kv[n].key) {
++        case IPROTO_SYNC:
++            sync = kv[n].val;
++            break;
++        case IPROTO_SCHEMA_VERSION:
++            version = kv[n].val;
++            break;
++        case IPROTO_REPLICA_ID:
++            replica_id = kv[n].val;
++            break;
++        case IPROTO_TIMESTAMP:
++            timestamp = kv[n].val_d;
++            break;
++        default:
++            goto out;
++        }
++    }
++
++    if (replica_id && timestamp) { /* heartbeat request */
++        const char *time = get_time(ndo, timestamp);
++        ND_PRINT(" request: HEARTBEAT, REPLICA_ID: %lu, TIMESTAMP: %s",
++                replica_id, (time) ? time : "NULL");
++        return;
++    }
++
++    ND_PRINT(" response: OK, SYNC: %lu, SCHEMA_VERSION: %lu", sync, version);
++    if (timestamp) {
++        const char *time = get_time(ndo, timestamp);
++        ND_PRINT(", TIMESTAMP: %s", (time) ? time : "NULL");
++    }
++
++    if (ndo->ndo_vflag == 0) {
++        return;
++    }
++
++    parse_body(ndo, msg);
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
++
++static void parse_error(netdissect_options *ndo, const char *msg,
++        const kv_t *kv, size_t kv_len)
++{
++    uint64_t sync, version, errcode;
++    uint32_t body_items;
++
++    if (kv_len != 3) {
++        goto out;
++    }
++
++    for (size_t n = 0; n < kv_len; n++) {
++        switch(kv[n].key) {
++        case IPROTO_SYNC:
++            sync = kv[n].val;
++            break;
++        case IPROTO_SCHEMA_VERSION:
++            version = kv[n].val;
++            break;
++        case IPROTO_REQUEST_TYPE:
++            errcode = kv[n].val;
++            break;
++        default:
++            goto out;
++        }
++    }
++
++    ND_PRINT(" response: ERR: %s, SYNC: %lu, SCHEMA_VERSION: %lu",
++            (errcode >= ARR_LEN(error_codes)) ? "unknown" :
++            error_codes[errcode], sync, version);
++
++    if (ndo->ndo_vflag == 0) {
++        return;
++    }
++
++    /* parse and print body */
++    if (mp_typeof(*msg) != MP_MAP) {
++        ND_PRINT_ERR_MPTYPE();
++        goto out;
++    }
++
++    body_items = mp_decode_map(&msg);
++
++    if (body_items == 1) { /* versions <= 2.4.0 */
++        uint64_t key;
++
++        if (mp_typeof(*msg) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        key = mp_decode_uint(&msg);
++
++        if (key == IPROTO_ERROR_24) {
++            const char *error;
++
++            if (mp_typeof(*msg) != MP_STR) {
++                ND_PRINT_ERR_MPTYPE();
++                goto out;
++            }
++
++            error = get_string(ndo, msg);
++            if (error) {
++                ND_PRINT("\nERROR: %s", error);
++            }
++        }
++        return;
++    }
++
++    for (uint32_t n = 0; n < body_items; n++) {
++        uint64_t key;
++
++        if (mp_typeof(*msg) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        key = mp_decode_uint(&msg);
++        switch(key) {
++        case IPROTO_ERROR_24:
++            mp_next(&msg);
++            break;
++        case IPROTO_ERROR:
++            /* format: {0: [{}]} */
++            {
++                uint32_t map_items, stack_size;
++
++                if (mp_typeof(*msg) != MP_MAP) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                if (mp_decode_map(&msg) != 1) {
++                    goto out;
++                }
++
++                if (mp_typeof(*msg) != MP_UINT) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                if (mp_decode_uint(&msg) != 0) { /* MP_ERROR_STACK */
++                    goto out;
++                }
++
++                if (mp_typeof(*msg) != MP_ARRAY) {
++                    ND_PRINT_ERR_MPTYPE();
++                    goto out;
++                }
++
++                stack_size = mp_decode_array(&msg);
++                for (uint32_t s = 0; s < stack_size; s++) {
++                    map_items = mp_decode_map(&msg);
++
++                    if (map_items && s != 0) {
++                        ND_PRINT("\n---");
++                    }
++
++                    for (uint32_t i = 0; i < map_items; i++) {
++                        uint64_t err_key;
++
++                        if (mp_typeof(*msg) != MP_UINT) {
++                            ND_PRINT_ERR_MPTYPE();
++                            goto out;
++                        }
++
++                        err_key = mp_decode_uint(&msg);
++                        switch(err_key) {
++                        case MP_ERROR_TYPE:
++                            {
++                                const char *type;
++
++                                if (mp_typeof(*msg) != MP_STR) {
++                                    ND_PRINT_ERR_MPTYPE();
++                                    goto out;
++                                }
++
++                                type = get_string(ndo, msg);
++                                if (type) {
++                                    ND_PRINT("\nTYPE: %s", type);
++                                }
++                                mp_next(&msg);
++                            }
++                            break;
++                        case MP_ERROR_FILE:
++                            {
++                                const char *file;
++
++                                if (mp_typeof(*msg) != MP_STR) {
++                                    ND_PRINT_ERR_MPTYPE();
++                                    goto out;
++                                }
++
++                                file = get_string(ndo, msg);
++                                if (file) {
++                                    ND_PRINT("\nFILE: %s", file);
++                                }
++                                mp_next(&msg);
++                            }
++                            break;
++                        case MP_ERROR_LINE:
++                            if (mp_typeof(*msg) != MP_UINT) {
++                                ND_PRINT_ERR_MPTYPE();
++                                goto out;
++                            }
++                            ND_PRINT("\nLINE: %lu", mp_decode_uint(&msg));
++                            break;
++                        case MP_ERROR_MESSAGE:
++                            {
++                                const char *message;
++
++                                if (mp_typeof(*msg) != MP_STR) {
++                                    ND_PRINT_ERR_MPTYPE();
++                                    goto out;
++                                }
++
++                                message = get_string(ndo, msg);
++                                if (message) {
++                                    ND_PRINT("\nMESSAGE: %s", message);
++                                }
++                                mp_next(&msg);
++                            }
++                            break;
++                        case MP_ERROR_ERRNO:
++                            if (mp_typeof(*msg) != MP_UINT) {
++                                ND_PRINT_ERR_MPTYPE();
++                                goto out;
++                            }
++                            ND_PRINT("\nERRNO: %lu", mp_decode_uint(&msg));
++                            break;
++                        case MP_ERROR_CODE:
++                            if (mp_typeof(*msg) != MP_UINT) {
++                                ND_PRINT_ERR_MPTYPE();
++                                goto out;
++                            }
++                            ND_PRINT("\nCODE: %lu", mp_decode_uint(&msg));
++                            break;
++                        case MP_ERROR_FIELDS:
++                            {
++                                uint32_t fields = mp_decode_map(&msg);
++
++                                if (fields) {
++                                    ND_PRINT("\nFIELDS:");
++                                }
++
++                                for (size_t f = 0; f < fields; f++) {
++                                    const char *k, *v;
++
++                                    if (mp_typeof(*msg) != MP_STR) {
++                                        ND_PRINT_ERR_MPTYPE();
++                                        goto out;
++                                    }
++
++                                    k = get_string(ndo, msg);
++                                    mp_next(&msg);
++                                    v = get_string(ndo, msg);
++                                    mp_next(&msg);
++
++                                    if (k && v) {
++                                        ND_PRINT(" %s: %s%s", k, v,
++                                                (f != fields - 1) ? "," : "");
++                                    }
++                                }
++                            }
++                            break;
++                        }
++                    }
++                }
++            }
++            break;
++        }
++    }
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
++
++static void parse_vote(netdissect_options *ndo, const char *msg,
++        const kv_t *kv, size_t kv_len)
++{
++    ND_PRINT(" request: VOTE");
++}
++
++/* IPROTO_RAFT body does not have unique key in enum iproto_key */
++static void parse_raft(netdissect_options *ndo, const char *msg,
++        const kv_t *kv, size_t kv_len)
++{
++    uint32_t body_items;
++    uint64_t sync, id;
++
++    sync = id = 0;
++
++    for (size_t n = 0; n < kv_len; n++) {
++        switch(kv[n].key) {
++        case IPROTO_SYNC:
++            sync = kv[n].val;
++            break;
++        case IPROTO_GROUP_ID:
++            id = kv[n].val;
++            break;
++        default:
++            goto out;
++        }
++    }
++
++    ND_PRINT(" request: RAFT, GROUP_ID: %lu, SYNC: %lu", id, sync);
++
++    if (ndo->ndo_vflag == 0) {
++        return;
++    }
++
++    if (mp_typeof(*msg) != MP_MAP) {
++        ND_PRINT_ERR_MPTYPE();
++        goto out;
++    }
++
++    body_items = mp_decode_map(&msg);
++
++    for (uint32_t n = 0; n < body_items; n++) {
++        uint64_t key;
++
++        if (mp_typeof(*msg) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        key = mp_decode_uint(&msg);
++        switch(key) {
++            CASE_IPROTO_UINT(RAFT_TERM);
++            CASE_IPROTO_UINT(RAFT_VOTE);
++            CASE_IPROTO_UINT(RAFT_STATE);
++            CASE_IPROTO_MAP(RAFT_VCLOCK);
++        }
++    }
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
++
++/* Greeting message format:
++ *  _version_:space:_uuid_:space::newline:_salt_:spaces:
++ */
++static int parse_greeting(netdissect_options *ndo, const char *msg)
++{
++    char version[GR_MAXLEN] = {0};
++    char uuid[GR_MAXLEN] = {0};
++    char *nl, *delim;
++    size_t len, ver_len, uuid_len;
++
++    if (strncmp(msg, "Tarantool", sizeof(GR_NAME) - 1) != 0) {
++        return 0;
++    }
++
++    ND_PRINT(": IPROTO: greeting: ");
++    nl = strchr(msg, '\n');
++
++    if (!nl) {
++        ND_PRINT("version: unknown, uuid: unknown");
++        nd_print_invalid(ndo);
++        return 1;
++    }
++
++    len = nl - msg;
++
++    memcpy(version, msg, len);
++    version[len] = '\0';
++
++    delim = strrchr(version, 0x20);
++    if (!delim) {
++        ND_PRINT("version: unknown, uuid: unknown");
++        nd_print_invalid(ndo);
++        return 1;
++    }
++
++    /* cut last space */
++    *delim = '\0';
++
++    delim = strrchr(version, 0x20);
++    if (!delim) {
++        ND_PRINT("version: unknown, uuid: unknown");
++        nd_print_invalid(ndo);
++        return 1;
++    }
++
++    ver_len = delim - version;
++
++    uuid_len = len - ver_len;
++    memcpy(uuid, delim + 1, uuid_len - 1);
++    uuid[uuid_len] = '\0';
++    version[ver_len] = '\0';
++
++    ND_PRINT("version: %s, uuid: %s", version, uuid);
++
++    /* print salt if verbose */
++    if (ndo->ndo_vflag >= 1) {
++        char salt[GR_MAXLEN] = {0};
++
++        delim = strchr(nl, 0x20);
++        if (!delim) {
++            return 1;
++        }
++
++        memcpy(salt, nl + 1, delim - nl - 1);
++        ND_PRINT(", salt: %s", salt);
++    }
++
++    return 1;
++}
++
++void
++tarantool_print(netdissect_options *ndo, const u_char *bp, u_int length)
++{
++    request_print_t print_req = NULL;
++    const char *payload = bp;
++    char *json_body = NULL;
++    char *json_hdr = NULL;
++    uint32_t header_items;
++    size_t kvs_len = 0;
++    uint64_t size;
++    kv_t *kvs;
++
++    if (!bp || length <= 0) {
++        return;
++    }
++
++    /* greeting message is not in MsgPack format */
++    if (length >= (sizeof(GR_NAME) - 1)) {
++        if (parse_greeting(ndo, payload)) {
++            return;
++        }
++    }
++
++    if (mp_typeof(*payload) != MP_UINT) {
++        return;
++    }
++
++    size = mp_decode_uint(&payload);
++
++    if (ndo->ndo_vflag == 2) {
++        json_hdr = get_json(ndo, payload);
++    }
++
++    /* parse header */
++    if (mp_typeof(*payload) != MP_MAP) {
++        return;
++    }
++
++    ND_PRINT(": IPROTO size=%lu", size);
++
++    header_items = mp_decode_map(&payload);
++
++    if (!header_items) {
++        goto out;
++    }
++
++    kvs = nd_malloc(ndo, header_items * sizeof(kv_t));
++    if (!kvs) {
++        return;
++    }
++
++    for (uint32_t n = 0; n < header_items; n++) {
++        uint64_t key, val;
++        double val_d = 0;
++
++        if (mp_typeof(*payload) != MP_UINT) {
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++        key = mp_decode_uint(&payload);
++
++        switch(mp_typeof(*payload)) {
++        case MP_UINT:
++            val = mp_decode_uint(&payload);
++            break;
++        case MP_DOUBLE:
++            val_d = mp_decode_double(&payload);
++            break;
++        default:
++            ND_PRINT_ERR_MPTYPE();
++            goto out;
++        }
++
++        if (key == IPROTO_REQUEST_TYPE) {
++            struct request *res;
++            struct request rkey = { .type = val };
++
++            /* error code is 0x8XXX */
++            if (val >> 12 == 8) {
++                uint32_t err = val & 0xfff;
++                kvs[kvs_len].key = key;
++                kvs[kvs_len].val = err;
++                kvs_len++;
++                rkey.type = IPROTO_TYPE_ERROR;
++            }
++
++            res = bsearch(&rkey, request_ops, ARR_LEN(request_ops),
++                    sizeof(struct request), request_compar);
++            if (res) {
++                print_req = res->print;
++            }
++
++            continue; /* we do not need to store request type */
++        }
++
++        kvs[kvs_len].key = key;
++        if (val_d) {
++            kvs[kvs_len].val_d = val_d;
++        } else {
++            kvs[kvs_len].val = val;
++        }
++        kvs_len++;
++    }
++
++    if (print_req) {
++        print_req(ndo, payload, kvs, kvs_len);
++    }
++
++    if (ndo->ndo_vflag == 2) {
++        json_body = get_json(ndo, payload);
++        if (json_hdr) {
++            ND_PRINT("\nheader: %s", json_hdr);
++        }
++        if (json_body) {
++            ND_PRINT("\nbody: %s", json_body);
++        }
++    }
++
++    return;
++out:
++    nd_print_invalid(ndo);
++}
+diff --git a/print-tcp.c b/print-tcp.c
+index 0c250a07..289cacf2 100644
+--- a/print-tcp.c
++++ b/print-tcp.c
+@@ -738,6 +738,9 @@ tcp_print(netdissect_options *ndo,
+                 case PT_RESP:
+                         resp_print(ndo, bp, length);
+                         break;
++                case PT_IPROTO:
++                        tarantool_print(ndo, bp, length);
++                        break;
+                 case PT_DOMAIN:
+                         /* over_tcp: TRUE, is_mdns: FALSE */
+                         domain_print(ndo, bp, length, TRUE, FALSE);
+diff --git a/tcpdump.1.in b/tcpdump.1.in
+index de5db995..d25ac0f0 100644
+--- a/tcpdump.1.in
++++ b/tcpdump.1.in
+@@ -729,6 +729,7 @@ Currently known types are
+ \fBrtp\fR (Real-Time Applications protocol),
+ \fBsnmp\fR (Simple Network Management Protocol),
+ \fBsomeip\fR (SOME/IP),
++\fBtarantool\fR (Tarantool binary protocol),
+ \fBtftp\fR (Trivial File Transfer Protocol),
+ \fBvat\fR (Visual Audio Tool),
+ \fBvxlan\fR (Virtual eXtensible Local Area Network),
+diff --git a/tcpdump.c b/tcpdump.c
+index a4403370..7937b119 100644
+--- a/tcpdump.c
++++ b/tcpdump.c
+@@ -1866,6 +1866,8 @@ main(int argc, char **argv)
+ 				ndo->ndo_packettype = PT_DOMAIN;
+ 			else if (ascii_strcasecmp(optarg, "quic") == 0)
+ 				ndo->ndo_packettype = PT_QUIC;
++			else if (ascii_strcasecmp(optarg, "tarantool") == 0)
++				ndo->ndo_packettype = PT_IPROTO;
+ 			else
+ 				error("unknown packet type `%s'", optarg);
+ 			break;
+diff --git a/tests/TESTLIST b/tests/TESTLIST
+index 1e741d46..8911517c 100644
+--- a/tests/TESTLIST
++++ b/tests/TESTLIST
+@@ -504,6 +504,11 @@ resp_1 resp_1_benchmark.pcap resp_1.out
+ resp_2 resp_2_inline.pcap    resp_2.out
+ resp_3 resp_3_malicious.pcap resp_3.out
+ 
++# IPROTO tests
++tarantool_base tarantool_base.pcap tarantool_base.out -T tarantool
++#tarantool_base-v tarantool_base.pcap tarantool_base_v.out -T tarantool -v
++#tarantool_base-vv tarantool_base.pcap tarantool_base_vv.out -T tarantool -vv
++
+ # TFTP tests
+ tftp   tftp.pcap tftp.out
+ tftp-T tftp.pcap tftp-T.out -T tftp

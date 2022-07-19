@@ -34,6 +34,7 @@
     ./gdb-dashboard/gdb-dashboard.nix
     #./nemu/nemu.nix
     ./python/python.nix
+    ./tcpdump/tcpdump.nix
     ./tmux/tmux.nix
     ./udevil/udevil.nix
     ./vim/vim.nix
