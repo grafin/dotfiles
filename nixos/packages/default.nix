@@ -15,6 +15,8 @@
     inetutils
     killall
     lazygit
+    man-pages
+    man-pages-posix
     nix-prefetch-git
     nodejs
     openjdk8
