@@ -2,6 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
+    bottom
     ccls
     codespell
     cppcheck
