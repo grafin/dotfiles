@@ -18,7 +18,6 @@
 
     extraConfig = ''
       workgroup = WORKGROUP
-      security = user
       browseable = yes
     '';
 
