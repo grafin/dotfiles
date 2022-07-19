@@ -7,7 +7,6 @@
     cppcheck
     file
     ffmpeg
-    gdb
     gh
     gitFull
     gnupg
@@ -35,6 +34,7 @@
 
   imports = [
     ./nemu/nemu.nix
+    ./gdb-dashboard/gdb-dashboard.nix
     ./python/python.nix
     ./schroot/schroot.nix
     ./tmux/tmux.nix
