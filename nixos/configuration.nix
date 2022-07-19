@@ -94,4 +94,11 @@
 
   # Debug symbols
   environment.enableDebugInfo = true;
+
+  security.pam.loginLimits = [{
+    domain = "*";
+    type = "soft";
+    item = "nofile";
+    value = "unlimited";
+  }];
 }
