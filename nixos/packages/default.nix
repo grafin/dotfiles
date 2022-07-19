@@ -24,6 +24,7 @@
     p7zip
     pandoc
     ranger
+    ripgrep-all
     tree
     udiskie
     universal-ctags
