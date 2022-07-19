@@ -14,9 +14,7 @@
     inetutils
     killall
     lazygit
-    maestral
     nix-prefetch-git
-    nnn
     nodejs
     openjdk8
     p7zip
