@@ -15,6 +15,19 @@
           "snippetSupport": true
         }
       }
+    },
+    "sumneko": {
+      "command": "lua-language-server",
+      "filetypes": ["lua"],
+      "rootPatterns": ["compile_commands.json", ".git/", ".hg/"],
+      "settings": {
+        "Lua": {
+          "workspace": {
+            "maxPreload": 2000,
+            "preloadFileSize": 1000
+          }
+        }
+      }
     }
   }
 }
