@@ -4,60 +4,27 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
-    ];
+  imports = [ ];
 
-  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "usbhid" "sd_mod" ];
-  boot.initrd.kernelModules = [ "dm-snapshot" ];
+  boot.initrd.availableKernelModules = [ "ata_piix" "mptspi" "uhci_hcd" "ehci_pci" "xhci_pci" "sd_mod" "sr_mod" ];
+  boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/root_pool/root";
+    { device = "/dev/disk/by-uuid/a410baa2-5f4a-4b0a-b3de-dbd1d9b3d465";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/D65C-7E5E";
+    { device = "/dev/disk/by-uuid/4D61-58E7";
       fsType = "vfat";
     };
 
-  fileSystems."/home" =
-    { device = "/dev/home_pool/home";
-      fsType = "ext4";
-    };
-
   swapDevices =
-    [ { device = "/dev/disk/by-label/swap"; }
+    [ { device = "/dev/disk/by-uuid/26b584af-db62-49c2-964b-9795f89d9255"; }
     ];
 
-  powerManagement.cpuFreqGovernor = lib.mkDefault "powersave";
-
-  # OpenGl
-  hardware.opengl = {
-    enable = true;
-    driSupport = true;
-    extraPackages = with pkgs; [
-      intel-media-driver # LIBVA_DRIVER_NAME=iHD
-      vaapiIntel         # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)
-      vaapiVdpau
-      libvdpau-va-gl
-    ];
-  };
-
-  # Tablet
-  hardware.opentabletdriver.enable = true;
-
-  # X Server
-  services = {
-    xserver = {
-      videoDrivers = [ "modesetting" ];
-      useGlamor = true;
-      layout = "us,ru";
-      xkbModel = "microsoft";
-      xkbOptions = "grp:caps_toggle,grp_led:caps,terminate:ctrl_alt_bksp";
-      displayManager.sessionCommands = "setxkbmap";
-    };
-  };
+  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+  virtualisation.vmware.guest.enable = true;
 }
