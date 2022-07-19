@@ -8,11 +8,7 @@
   imports = [
       ./hardware-configuration.nix
       ./network.nix
-      ./fonts.nix
-      ./i3.nix
       ./packages/default.nix
-      ./packages/gui/default.nix
-      ./packages/audio/default.nix
       ./www.nix
       ./remote.nix
       ./secret.nix
@@ -39,37 +35,14 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "20.09"; # Did you read the comment?
 
-  # Sound
-  sound.enable = true;
-  hardware = {
-    pulseaudio = {
-      enable = true;
-      support32Bit = true;
-    };
-  };
-
   # Services
   services = {
-    logind.extraConfig = ''
-      HandlePowerKey=suspend
-      IdleAction=ignore
-      IdleActionSec=60min
-    '';
     openssh = {
       enable = true;
       forwardX11 = true;
       passwordAuthentication = false;
       challengeResponseAuthentication = false;
     };
-    printing = {
-      enable = true;
-      drivers = with pkgs; [
-        cnijfilter2
-        cups-filters
-        gutenprint
-      ];
-    };
-    devmon.enable = true;
     fail2ban.enable = true;
   };
 
@@ -95,7 +68,7 @@
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
-    pinentryFlavor = "gnome3";
+    pinentryFlavor = "tty";
   };
 
   # Podman
@@ -112,40 +85,14 @@
     home = "/home/boris";
     description = "Stepanenko Boris";
     extraGroups = [
-      "audio"
       "wheel"
-      "wireshark"
     ];
   };
 
-  # Packages
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-    "android-studio-stable"
-    "cnijfilter2"
-    "discord"
-    "geogebra"
-    "hunspell-dict-nl-nl"
-    "reaper"
-    "skypeforlinux"
-    "sublime-merge"
-    "sublimetext4"
-    "teams"
-    "unityhub"
-    "yEd"
-    "zoom"
-  ];
   environment.systemPackages = with pkgs; [
     home-manager
   ];
   nix.autoOptimiseStore = true;
-
-  # Audio limits
-  security.pam.loginLimits = [
-    { domain = "@audio"; item = "memlock"; type = "-"   ; value = "unlimited"; }
-    { domain = "@audio"; item = "nofile" ; type = "hard"; value = "99999"    ; }
-    { domain = "@audio"; item = "nofile" ; type = "soft"; value = "99999"    ; }
-    { domain = "@audio"; item = "rtprio" ; type = "-"   ; value = "99"       ; }
-  ];
 
   # Man
   documentation.dev.enable = true;
