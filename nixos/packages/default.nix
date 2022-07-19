@@ -33,10 +33,9 @@
   programs.mtr.enable = true;
 
   imports = [
-    ./nemu/nemu.nix
     ./gdb-dashboard/gdb-dashboard.nix
+    #./nemu/nemu.nix
     ./python/python.nix
-    ./schroot/schroot.nix
     ./tmux/tmux.nix
     ./udevil/udevil.nix
     ./vim/vim.nix
