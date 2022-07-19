@@ -24,8 +24,8 @@ bind j scrollline 5
 bind k scrollline -5
 
 " K and J should move between tabs. x should close them.
-bind K tabprev
-bind J tabnext
+bind J tabprev
+bind K tabnext
 bind x tabclose
 
 " Sometimes the status bar in the bottom left corner overlaps the Tridactyl
