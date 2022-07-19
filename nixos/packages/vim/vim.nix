@@ -3,12 +3,12 @@
 let
   omnisharp-vim = pkgs.vimUtils.buildVimPluginFrom2Nix {
     pname = "omnisharp-vim";
-    version = "unstable-2021-08-30";
+    version = "unstable-2022-04-05";
     src = pkgs.fetchFromGitHub {
       owner = "OmniSharp";
       repo = "omnisharp-vim";
-      rev = "ab6348c61211fb88bad19a1e89ee65ec3243f0b7";
-      sha256 = "154wy256g8gnhsh924ihs1bysl9flm0snpigrn31b2hg9nqiw2hn";
+      rev = "08d85b86978cb02d5faf3d266bf3fb233e98d463";
+      sha256 = "0kdycajw21igkwzgfnp9kj8ksgw1xhg5l945bk1k0lcbsv5m5awk";
     };
     meta.homepage = "https://github.com/OmniSharp/omnisharp-vim";
   };
@@ -31,12 +31,14 @@ in {
             coc-python
             coc-snippets
             coc-spell-checker
+            coc-tsserver
             coc-yaml
             lightline-vim
             nerdtree
             nerdtree-git-plugin
             omnisharp-vim
             papercolor-theme
+            typescript-vim
             vim-easytags
             vim-flake8
             vim-fugitive
@@ -49,6 +51,7 @@ in {
             vim-snippets
             vim-tmux-focus-events
             vim-tmux-navigator
+            vimproc-vim
           ];
           opt = [];
         };
@@ -69,7 +72,7 @@ in {
         highlight ColorColumn ctermbg=darkgray
         set noshowmode
         set laststatus=2
-        let g:lightline = {'colorscheme': 'PaperColor',}
+        let g:lightline = {"colorscheme": "PaperColor",}
 
         syntax on
         set t_Co=256
@@ -99,8 +102,16 @@ in {
         let g:OmniSharp_log_dir = $HOME."/.local/share/omnisharp/log"
         let g:OmniSharp_server_use_mono = 1
 
-        autocmd FileType make set tabstop=4 softtabstop=0 shiftwidth=4 noexpandtab
+        autocmd FileType c set tabstop=8 softtabstop=8 shiftwidth=8 noexpandtab
         autocmd FileType cmake set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+        autocmd FileType cpp set tabstop=8 softtabstop=8 shiftwidth=8 noexpandtab
+        autocmd FileType css set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+        autocmd FileType golang set tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+        autocmd FileType html set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+        autocmd FileType javascript set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+        autocmd FileType lua set tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+        autocmd FileType make set tabstop=4 softtabstop=0 shiftwidth=4 noexpandtab
+        autocmd FileType typescript set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 
         match ExtraWhitespace /\s\+\%#\@<!$/
         autocmd InsertEnter * match ExtraWhitespace /\s\+\%#\@<!$/
@@ -156,6 +167,9 @@ in {
   })
   mono
   neovim-remote
+  nodePackages.typescript
+  nodePackages.coc-tsserver
   omnisharp-roslyn
+  sumneko-lua-language-server
   ];
 }
