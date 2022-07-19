@@ -17,6 +17,7 @@
     lazygit
     man-pages
     man-pages-posix
+    nix-index
     nix-prefetch-git
     nodejs
     openjdk8
