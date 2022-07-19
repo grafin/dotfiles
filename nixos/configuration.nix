@@ -42,7 +42,6 @@
       passwordAuthentication = false;
       kbdInteractiveAuthentication = false;
     };
-    fail2ban.enable = true;
   };
 
   # Internationalisation properties.
