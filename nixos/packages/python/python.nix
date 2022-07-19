@@ -26,6 +26,7 @@ let
     flake8
     jedi
     pygments
+    pylint
     sympy_1_5_1
   ];
 
