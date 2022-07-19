@@ -2,95 +2,58 @@
 
 {
   networking = {
-    hostName = "mainhost";
+    hostName = "nixos";
     useDHCP = false;
 
-    bridges.br0.interfaces = [ "enp3s0" "enp5s0" "veth_br0_0" ];
-    interfaces.br0 = {
-      useDHCP = true;
-      macAddress = "DE:AD:BE:EF:FF:FF";
-    };
-
-    interfaces.veth_ll_0.ipv4.addresses = [
-      {
-        address = "169.254.1.1";
-        prefixLength = 16;
-      }
-    ];
-
-    interfaces.veth_vipnet_0.ipv4 = {
-      addresses = [
-        {
-          address = "172.17.0.2";
+    interfaces = {
+      ens33.ipv4 = {
+        addresses = [{
+          address = "172.16.17.10";
           prefixLength = 24;
-        }
-      ];
-      routes = [
-        {
-          address = "11.0.0.0";
-          prefixLength = 8;
-          via = "172.17.0.1";
-        }
-        {
-          address = "10.0.0.0";
-          prefixLength = 16;
-          via = "172.17.0.1";
-        }
-        {
-          address = "172.31.0.0";
-          prefixLength = 16;
-          via = "172.17.0.1";
-        }
-        {
-          address = "192.168.40.0";
-          prefixLength = 24;
-          via = "172.17.0.1";
-        }
-        {
-          address = "192.168.100.0";
-          prefixLength = 24;
-          via = "172.17.0.1";
-        }
-      ];
+        }];
+        routes = [{
+          address = "0.0.0.0";
+          prefixLength = 0;
+          via = "172.16.17.2";
+        }];
+      };
     };
 
     nameservers = [
-      "172.17.0.1"
+      "1.1.1.1"
+      "1.0.0.1"
     ];
+
+    hosts = {
+      "172.16.17.2" = [ "host" ];
+    };
 
     firewall = {
       enable = true;
       allowPing = true;
       allowedUDPPorts = [
         22 # SSH
-        55777 # WG
       ];
       allowedTCPPorts = [
         22 # SSH
-        20509 # nemu
+        80 # nginx
+
+        # tarantool
+        3301
+        3302
+        3303
+        13301
+        13302
+        13303
+
+        # cartridge web-ui
+        8081
+        8082
+        8083
+        8091
+        8092
+        8093
       ];
     };
-
-    wireguard.interfaces = {
-      wg0 = {
-        ips = [ "172.16.0.2/24" ];
-        listenPort = 55777;
-
-        privateKeyFile = "/root/wireguard/mainhost";
-
-        peers = [
-          {
-            publicKey = "JKiITZg+TFXooIVsoU48U9EOehZMigMwXihlMx/BAzI=";
-            presharedKeyFile = "/root/wireguard/mainhost.preshared";
-            allowedIPs = [ "172.16.0.0/24" ];
-            endpoint = "46.39.239.57:55777";
-          }
-        ];
-      };
-    };
-  };
-
-  networking.hosts = {
-    "178.154.251.97" = [ "nixos.org" ];
   };
 }
