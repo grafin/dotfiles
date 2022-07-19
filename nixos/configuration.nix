@@ -91,4 +91,7 @@
 
   # Man
   documentation.dev.enable = true;
+
+  # Debug symbols
+  environment.enableDebugInfo = true;
 }
