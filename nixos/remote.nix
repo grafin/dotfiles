@@ -30,12 +30,4 @@
       };
     };
   };
-
-  environment.systemPackages = with pkgs; [
-    x2goserver
-  ];
-
-  services.x2goserver = {
-    enable = true;
-  };
 }
