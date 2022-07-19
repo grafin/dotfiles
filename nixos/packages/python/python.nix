@@ -25,6 +25,7 @@ let
   my-python-packages = python-packages: with python-packages; [
     flake8
     jedi
+    pygments
     sympy_1_5_1
   ];
 
