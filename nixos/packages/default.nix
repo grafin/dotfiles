@@ -18,6 +18,7 @@
     man-pages
     man-pages-posix
     nix-index
+    nix-output-monitor
     nix-prefetch-git
     nodejs
     openjdk8
