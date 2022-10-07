@@ -98,6 +98,10 @@
   # Debug symbols
   environment.enableDebugInfo = true;
 
+  environment.variables = {
+    NIX_SHELL_PRESERVE_PROMPT = "true";
+  };
+
   security.pam.loginLimits = [{
     domain = "*";
     type = "soft";
