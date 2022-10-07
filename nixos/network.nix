@@ -17,6 +17,12 @@
           via = "172.16.17.2";
         }];
       };
+      ens34.ipv4 = {
+        addresses = [{
+          address = "172.16.112.10";
+          prefixLength = 24;
+        }];
+      };
     };
 
     nameservers = [
@@ -25,7 +31,7 @@
     ];
 
     hosts = {
-      "172.16.17.2" = [ "host" ];
+      "172.16.112.1" = [ "host" ];
     };
 
     firewall = {
