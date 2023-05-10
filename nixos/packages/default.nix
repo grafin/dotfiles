@@ -13,6 +13,7 @@
     gh
     gitFull
     gnupg
+    goofys
     haskellPackages.update-nix-fetchgit
     inetutils
     killall
