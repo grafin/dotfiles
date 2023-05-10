@@ -11,6 +11,7 @@
       ./www.nix
       ./remote.nix
       ./packages/default.nix
+      ./secret_vk.nix
     ];
 
   # Use systemd-boot EFI boot loader.
