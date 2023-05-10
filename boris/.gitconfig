@@ -1,9 +1,6 @@
 [includeIf "gitdir:**/github/**"]
     path = ~/.config/git/gmail.conf
 
-[includeIf "gitdir:**/gitlab/**"]
-    path = ~/.config/git/gmail.conf
-
 [includeIf "gitdir:**/egress/**"]
     path = ~/.config/git/gmail.conf
 
@@ -14,3 +11,7 @@
 
 [pull]
     rebase = true
+
+[push]
+    default = simple
+    autoSetupRemote = true
