@@ -29,7 +29,6 @@ in {
             coc-json
             coc-nvim
             coc-pyright
-            coc-python
             coc-snippets
             coc-spell-checker
             coc-tsserver
