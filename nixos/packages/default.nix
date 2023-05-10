@@ -8,8 +8,8 @@
     ccls
     codespell
     cppcheck
-    file
     ffmpeg
+    file
     gh
     gitFull
     gnupg
