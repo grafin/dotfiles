@@ -94,6 +94,14 @@ function __transfer {
     fi
 }
 
+gdb() {
+    local id="$(tmux split-pane -hPF "#D" "tail -f /dev/null")"
+    tmux last-pane
+    local tty="$(tmux display-message -p -t "$id" '#{pane_tty}')"
+    gdb-dashboard -ex "dashboard -output $tty" "$@"
+    tmux kill-pane -t "$id"
+}
+
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=
 
