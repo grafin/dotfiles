@@ -170,6 +170,7 @@ in {
       '';
     };
   })
+  gopls
   mono
   neovim-remote
   nodePackages.typescript
