@@ -1,2 +1,3 @@
 *.swp
 nixos/secret*.nix
+boris/.config/git/secret/

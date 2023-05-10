@@ -87,7 +87,7 @@
   users.users.boris = {
     isNormalUser = true;
     home = "/home/boris";
-    description = "Stepanenko Boris";
+    description = "Demidov Borislav";
     extraGroups = [
       "wheel"
     ];
