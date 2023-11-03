@@ -16,7 +16,7 @@ in {
   environment.variables = { EDITOR = "vim"; };
 
   environment.systemPackages = with pkgs; [
-    nodejs-16_x
+    nodejs_20
     (neovim.override {
       vimAlias = true;
       configure = {
@@ -141,7 +141,7 @@ in {
         inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm() : "\<C-g>u\<CR>"
 
         " Configure github copilot
-        let g:copilot_node_command = "${nodejs-16_x}/bin/node"
+        let g:copilot_node_command = "${nodejs_20}/bin/node"
 
         " Split navigation
         map <C-j> <C-W>j
