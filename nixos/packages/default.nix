@@ -28,6 +28,7 @@
     openjdk8
     p7zip
     pandoc
+    patchelf
     ranger
     ripgrep-all
     tree
