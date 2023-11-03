@@ -19,7 +19,7 @@
       };
       ens34.ipv4 = {
         addresses = [{
-          address = "172.16.112.10";
+          address = "172.16.18.10";
           prefixLength = 24;
         }];
       };
@@ -31,7 +31,7 @@
     ];
 
     hosts = {
-      "172.16.112.1" = [ "host" ];
+      "172.16.18.1" = [ "host" ];
     };
 
     firewall = {
