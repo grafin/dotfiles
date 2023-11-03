@@ -24,7 +24,6 @@
     nix-index
     nix-output-monitor
     nix-prefetch-git
-    nodejs
     openjdk8
     p7zip
     pandoc
