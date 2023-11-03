@@ -28,6 +28,7 @@
     p7zip
     pandoc
     patchelf
+    podman-compose
     ranger
     ripgrep-all
     tree
