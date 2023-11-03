@@ -16,6 +16,11 @@
         }
       }
     },
+    "golang": {
+      "command": "/var/run/current-system/sw/bin/gopls",
+      "rootPatterns": ["go.mod", ".vim/", ".git/", ".hg/"],
+      "filetypes": ["go"]
+    },
     "sumneko": {
       "command": "lua-language-server",
       "filetypes": ["lua"],
