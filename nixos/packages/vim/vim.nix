@@ -31,6 +31,7 @@ in {
             coc-pyright
             coc-snippets
             coc-spell-checker
+            coc-rust-analyzer
             coc-tsserver
             coc-yaml
             copilot-vim
@@ -176,6 +177,7 @@ in {
   nodePackages.typescript
   nodePackages.coc-tsserver
   omnisharp-roslyn
+  rust-analyzer
   sumneko-lua-language-server
   ];
 }
