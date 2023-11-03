@@ -3,16 +3,22 @@
 let
   tcpdump-patched = pkgs.tcpdump.overrideAttrs(
     attrs: {
-      version = "custom";
+      version = "unstable-2023-09-09";
 
       src = pkgs.fetchFromGitHub {
         owner = "the-tcpdump-group";
         repo = "tcpdump";
-        rev = "c8bf9d20b3531d925101578cb5ca1613dc7f9d78";
-        sha256 = "01kg4i538n9a364wdf2lhfczy2l6239015f5lbl6b8jyc388w9bg";
+        rev = "48a2f9ecac9e9480771f13479ddbf866cb36c9d7";
+        sha256 = "10kwhp0nfqxd1cc1c3yzxx18b0cfs69p4byyr024wn5y0y8lm4ab";
       };
 
       patches = [ ./patches/tarantool.patch ];
+
+      buildInputs = attrs.buildInputs ++ [ pkgs.autoconf ];
+
+      preConfigure = ''
+        ./autogen.sh
+      '';
     }
   );
 in {
