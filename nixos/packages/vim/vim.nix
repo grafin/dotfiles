@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 let
-  omnisharp-vim = pkgs.vimUtils.buildVimPluginFrom2Nix {
+  omnisharp-vim = pkgs.vimUtils.buildVimPlugin {
     pname = "omnisharp-vim";
     version = "unstable-2022-04-05";
     src = pkgs.fetchFromGitHub {
