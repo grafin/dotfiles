@@ -16,6 +16,7 @@
     goofys
     haskellPackages.update-nix-fetchgit
     inetutils
+    jq
     killall
     lazygit
     man-pages
