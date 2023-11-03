@@ -38,6 +38,7 @@ in {
             lightline-vim
             nerdtree
             nerdtree-git-plugin
+            nvim-jqx
             omnisharp-vim
             papercolor-theme
             typescript-vim
