@@ -46,8 +46,8 @@
       enable = true;
       settings = {
         X11Forwarding = true;
-        passwordAuthentication = false;
-        kbdInteractiveAuthentication = false;
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
       };
     };
   };
