@@ -43,6 +43,9 @@
       allowedTCPPorts = [
         22 # SSH
         80 # nginx
+        2181 # zookeeper
+        2182 # zookeeper-admin
+        9092 # kafka
         50051 # gRPC
 
         # tarantool
