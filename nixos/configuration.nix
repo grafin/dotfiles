@@ -11,6 +11,7 @@
       ./www.nix
       ./remote.nix
       ./packages/default.nix
+      ./pproxy.nix
       ./kafka.nix
       ./secret_vk.nix
     ];

@@ -144,6 +144,7 @@ in {
 
         " Configure github copilot
         let g:copilot_node_command = "${nodejs_20}/bin/node"
+        " let g:copilot_proxy = "localhost:1337"
 
         " Split navigation
         map <C-j> <C-W>j
