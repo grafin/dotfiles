@@ -74,7 +74,7 @@
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
-    pinentryFlavor = "tty";
+    pinentryFlavor = "curses";
   };
 
   # Podman
