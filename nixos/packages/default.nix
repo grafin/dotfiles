@@ -19,6 +19,7 @@
     jq
     killall
     lazygit
+    lsof
     man-pages
     man-pages-posix
     nix-index
