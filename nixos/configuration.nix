@@ -85,12 +85,18 @@
     };
   };
 
+  # Groups
+  users.groups = {
+    docker = { };
+  };
+
   # Users
   users.users.boris = {
     isNormalUser = true;
     home = "/home/boris";
     description = "Demidov Borislav";
     extraGroups = [
+      "docker"
       "wheel"
     ];
   };
