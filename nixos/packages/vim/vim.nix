@@ -24,6 +24,7 @@ in {
           start = [
             coc-cmake
             coc-css
+            coc-diagnostic
             coc-go
             coc-html
             coc-json
@@ -174,10 +175,11 @@ in {
     };
   })
   gopls
+  hadolint
   mono
   neovim-remote
-  nodePackages.typescript
   nodePackages.coc-tsserver
+  nodePackages.typescript
   omnisharp-roslyn
   rust-analyzer
   sumneko-lua-language-server

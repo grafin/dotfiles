@@ -3,6 +3,10 @@
   "python.jediPath": "/var/run/current-system/sw/lib/python3.9/site-packages",
   "rust-analyzer.server.path": "/var/run/current-system/sw/bin/rust-analyzer",
 
+  "diagnostic-languageserver.filetypes": {
+    "dockerfile": "hadolint"
+  },
+
   "languageserver": {
     "ccls": {
       "command": "ccls",
