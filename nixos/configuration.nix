@@ -113,4 +113,12 @@
     item = "nofile";
     value = "unlimited";
   }];
+
+  security.sudo.extraRules= [{
+    users = [ "boris" ];
+    commands = [{
+      command = "ALL";
+      options= [ "NOPASSWD" ];
+    }];
+  }];
 }
