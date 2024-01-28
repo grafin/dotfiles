@@ -4,6 +4,8 @@
   networking = {
     hostName = "nixos";
     useDHCP = false;
+    enableIPv6 = false;
+    resolvconf.useLocalResolver = false;
 
     interfaces = {
       ens33.ipv4 = {
@@ -22,6 +24,9 @@
           address = "172.16.18.10";
           prefixLength = 24;
         }];
+      };
+      ens37 = {
+        useDHCP = true;
       };
     };
 
