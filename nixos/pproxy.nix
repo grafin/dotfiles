@@ -20,6 +20,7 @@
         "${python.interpreter} -m pproxy -l $PPROXY_BIND_PATH -r $PPROXY_PROXY_SERVER";
     };
     wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
     after = [ "network-online.target" ];
   };
 
