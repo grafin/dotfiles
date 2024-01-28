@@ -44,9 +44,11 @@
       allowPing = true;
       allowedUDPPorts = [
         22 # SSH
+        53 # DNS
       ];
       allowedTCPPorts = [
         22 # SSH
+        53 # DNS
         80 # nginx
         2181 # zookeeper
         2182 # zookeeper-admin
@@ -71,6 +73,12 @@
         8091
         8092
         8093
+
+        # Minecraft
+        10001
+        10002
+        19132
+        25565
 
         # TCF
         10080

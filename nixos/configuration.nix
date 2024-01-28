@@ -12,8 +12,9 @@
       ./remote.nix
       ./packages/default.nix
       ./pproxy.nix
-      ./kafka.nix
+      #./kafka.nix
       ./secret_vk.nix
+      ./minecraft-server.nix
     ];
 
   # Use systemd-boot EFI boot loader.
@@ -127,4 +128,9 @@
       options= [ "NOPASSWD" ];
     }];
   }];
+
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+   "minecraft-server-1.20.4"
+  ];
 }
