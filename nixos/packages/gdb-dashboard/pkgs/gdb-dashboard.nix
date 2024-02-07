@@ -29,6 +29,8 @@ in stdenv.mkDerivation rec {
     mkdir -p $out/share/gdb-dashboard
     sed 's/monokai/default/' .gdbinit > $out/share/gdb-dashboard/gdbinit
     chmod +x $out/share/gdb-dashboard/gdbinit
+    makeWrapper ${gdb}/bin/gdbserver $out/bin/gdbserver
+    makeWrapper ${gdb}/bin/gdb $out/bin/gdb
     makeWrapper ${gdb}/bin/gdb $out/bin/gdb-dashboard \
       --add-flags "-q --init-command=$out/share/gdb-dashboard/gdbinit" \
       --set NIX_PYTHONPATH ${pythonPath}
