@@ -9,8 +9,9 @@
   };
   services.apache-kafka = {
     enable = true;
-    extraProperties = ''
-      offsets.topic.replication.factor = 1
-    '';
+    settings = {
+      "offsets.topic.replication.factor" = 1;
+      "log.dirs" = [ "/tmp/apache-kafka" ];
+    };
   };
 }
