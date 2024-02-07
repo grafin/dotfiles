@@ -3,6 +3,7 @@
 {
   services.bind = {
     enable = true;
+    listenOn = [ "192.168.0.70" ];
     extraOptions = ''
       recursion no;
     '';
