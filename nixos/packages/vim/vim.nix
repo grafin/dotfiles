@@ -30,15 +30,16 @@ in {
             coc-json
             coc-nvim
             coc-pyright
+            coc-rust-analyzer
             coc-snippets
             coc-spell-checker
-            coc-rust-analyzer
             coc-tsserver
             coc-yaml
             copilot-vim
             lightline-vim
             nerdtree
             nerdtree-git-plugin
+            nvim-gdb
             nvim-jqx
             omnisharp-vim
             papercolor-theme
@@ -171,6 +172,21 @@ in {
         map <F10> :call flake8#Flake8ShowError()<CR>
         map <F11> :call flake8#Flake8UnplaceMarkers()<CR>
         set pastetoggle=<F12>
+
+        " nvim-gdb
+        function! NvimGdbNoTKeymaps()
+          tnoremap <silent> <buffer> <esc> <c-\><c-n>
+        endfunction
+
+        let g:nvimgdb_config_override = {
+          \ 'key_next': 'n',
+          \ 'key_step': 's',
+          \ 'key_finish': 'f',
+          \ 'key_continue': 'c',
+          \ 'key_until': 'u',
+          \ 'key_breakpoint': 'b',
+          \ 'set_tkeymaps': "NvimGdbNoTKeymaps",
+          \ }
       '';
     };
   })
@@ -181,6 +197,7 @@ in {
   nodePackages.coc-tsserver
   nodePackages.typescript
   omnisharp-roslyn
+  rr
   rust-analyzer
   sumneko-lua-language-server
   ];
