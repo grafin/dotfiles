@@ -75,7 +75,7 @@
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
-    pinentryFlavor = "curses";
+    pinentryPackage = pkgs.pinentry-gtk2;
   };
 
   # Podman
