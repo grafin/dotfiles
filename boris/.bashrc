@@ -127,3 +127,8 @@ alias cpv='rsync -vhae ssh --progress'
 # transfer
 alias transfer='__transfer "https://transfer.sh"'
 alias transfer_bk='__transfer "https://t.bk.ru"'
+
+# Get the secret aliases and functions
+if [ -f ~/.bashrc.secret ]; then
+    . ~/.bashrc.secret
+fi

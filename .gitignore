@@ -4,3 +4,4 @@ nixos/secret*.env
 boris/.config/git/secret/
 boris/.ssh/secret
 boris/.netrc
+boris/.bashrc.secret
