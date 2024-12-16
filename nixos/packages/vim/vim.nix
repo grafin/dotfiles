@@ -46,7 +46,6 @@ in {
             papercolor-theme
             typescript-vim
             vim-easytags
-            vim-flake8
             vim-fugitive
             vim-lastplace
             vim-nix
@@ -87,16 +86,6 @@ in {
         colorscheme PaperColor
 
         set updatetime=100
-
-        highlight link Flake8_Error      Error
-        highlight link Flake8_Warning    WarningMsg
-        highlight link Flake8_Complexity WarningMsg
-        highlight link Flake8_Naming     WarningMsg
-        highlight link Flake8_PyFlake    WarningMsg
-
-        let g:flake8_show_in_gutter = 1
-        let g:flake8_show_in_file = 1
-        let g:flake8_show_quickfix = 1
 
         let g:NERDTreeDirArrowExpandable = ""
         let g:NERDTreeDirArrowCollapsible = ""
@@ -169,9 +158,6 @@ in {
         nmap <silent> <F7> <Plug>(coc-references)
         nmap <silent> <F8> <Plug>(coc-type-definition)
 
-        map <F9> :call flake8#Flake8()<CR>
-        map <F10> :call flake8#Flake8ShowError()<CR>
-        map <F11> :call flake8#Flake8UnplaceMarkers()<CR>
         set pastetoggle=<F12>
 
         " nvim-gdb
