@@ -1,4 +1,4 @@
-From 13d4b336fb5da3663739f680514fc75c5b270325 Mon Sep 17 00:00:00 2001
+From 993211a87a219295669db6106dd835631ae3381d Mon Sep 17 00:00:00 2001
 From: Pavel Balaev <balaev@tarantool.org>
 Date: Mon, 27 Dec 2021 14:51:05 +0300
 Subject: [PATCH] Tarantool binary protocol support
@@ -67,7 +67,7 @@ index c83eb8b6d..4b1097183 100644
      print-telnet.c
      print-tftp.c
 diff --git a/Makefile.in b/Makefile.in
-index 2128b640f..0602b9bff 100644
+index 76be5892a..3ff441c0c 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -231,6 +231,7 @@ LIBNETDISSECT_SRC=\
@@ -151,7 +151,7 @@ index 4e0dc2dee..75c34fbd1 100644
  AC_ARG_ENABLE([instrument-functions],
     [AS_HELP_STRING([--enable-instrument-functions],
 diff --git a/netdissect.h b/netdissect.h
-index dcdc2548c..a9669fd18 100644
+index 51c56e2b8..a5896297f 100644
 --- a/netdissect.h
 +++ b/netdissect.h
 @@ -305,6 +305,7 @@ NORETURN void nd_trunc_longjmp(netdissect_options *ndo);
@@ -2581,7 +2581,7 @@ index 000000000..fcdd748c8
 +}
 +#endif
 diff --git a/print-tcp.c b/print-tcp.c
-index f9dfbb7cb..c6fa47242 100644
+index 4f91b7622..6458c2b03 100644
 --- a/print-tcp.c
 +++ b/print-tcp.c
 @@ -742,6 +742,11 @@ tcp_print(netdissect_options *ndo,
@@ -2608,18 +2608,21 @@ index f9dfbb7cb..c6fa47242 100644
                   length >= 4) {
                  /*
 diff --git a/tcp.h b/tcp.h
-index a4c28b61c..e5edd7a1e 100644
+index 268869a45..535df31de 100644
 --- a/tcp.h
 +++ b/tcp.h
-@@ -158,3 +158,6 @@ extern const struct tok tcp_flag_values[];
- #ifndef REDIS_PORT
- #define REDIS_PORT		6379
+@@ -140,6 +140,9 @@ extern const struct tok tcp_flag_values[];
+ #ifndef NFS_PORT
+ #define NFS_PORT		2049
  #endif
 +#ifndef TARANTOOL_PORT
 +#define TARANTOOL_PORT	3301
 +#endif
+ #ifndef REDIS_PORT
+ #define REDIS_PORT		6379
+ #endif
 diff --git a/tcpdump.1.in b/tcpdump.1.in
-index 652dd7968..ba287702e 100644
+index 6031816b8..e2080344a 100644
 --- a/tcpdump.1.in
 +++ b/tcpdump.1.in
 @@ -748,6 +748,7 @@ Currently known types are
@@ -2631,10 +2634,10 @@ index 652dd7968..ba287702e 100644
  \fBvat\fR (Visual Audio Tool),
  \fBvxlan\fR (Virtual eXtensible Local Area Network),
 diff --git a/tcpdump.c b/tcpdump.c
-index b5893eba8..cba6d4f26 100644
+index a7756be56..75b925055 100644
 --- a/tcpdump.c
 +++ b/tcpdump.c
-@@ -1887,6 +1887,10 @@ main(int argc, char **argv)
+@@ -1919,6 +1919,10 @@ main(int argc, char **argv)
  				ndo->ndo_packettype = PT_DOMAIN;
  			else if (ascii_strcasecmp(optarg, "quic") == 0)
  				ndo->ndo_packettype = PT_QUIC;
@@ -2643,5 +2646,5 @@ index b5893eba8..cba6d4f26 100644
 +				ndo->ndo_packettype = PT_IPROTO;
 +#endif
  			else
- 				error("unknown packet type `%s'", optarg);
+ 				error("unknown packet type '%s'", optarg);
  			break;
