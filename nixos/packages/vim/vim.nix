@@ -33,6 +33,7 @@ in {
             coc-rust-analyzer
             coc-snippets
             coc-spell-checker
+            coc-sumneko-lua
             coc-tsserver
             coc-yaml
             copilot-vim
@@ -199,6 +200,10 @@ in {
   omnisharp-roslyn
   rr
   rust-analyzer
-  sumneko-lua-language-server
+  lua-language-server
+  ];
+
+  environment.pathsToLink = [
+    "/share/lua-language-server"
   ];
 }
