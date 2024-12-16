@@ -1,11 +1,6 @@
 { pkgs, ... }:
 
 {
-  environment.systemPackages = with pkgs; [
-    python3
-    python310Packages.pproxy
-  ];
-
   systemd.services.pproxy = {
     enable = true;
     description = "pproxy server";
