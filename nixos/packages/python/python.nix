@@ -8,6 +8,7 @@ let
     pygments
     pylint
     sympy
+    scapy
   ];
 
   my-python = pkgs.python3.withPackages my-python-packages;
