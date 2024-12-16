@@ -14,16 +14,16 @@
 
   services.samba = {
     enable = true;
-    securityType = "user";
 
-    extraConfig = ''
-      workgroup = WORKGROUP
-      browseable = yes
-    '';
+    settings = {
+      global = {
+        workgroup = "WORKGROUP";
+        security = "user";
+      };
 
-    shares = {
-      homes = {
+      public = {
         browseable = "no";
+        path = "/home";
         "read only" = "no";
         "guest ok" = "no";
       };
