@@ -157,6 +157,9 @@ in {
         nmap <silent> <F6> <Plug>(coc-definition)
         nmap <silent> <F7> <Plug>(coc-references)
         nmap <silent> <F8> <Plug>(coc-type-definition)
+        nnoremap <silent><nowait> <F9> :<C-u>CocList diagnostics<cr>
+        nmap <F10> <Plug>(coc-rename)
+        nmap <F11> <Plug>(coc-codelens-action)
 
         set pastetoggle=<F12>
 
