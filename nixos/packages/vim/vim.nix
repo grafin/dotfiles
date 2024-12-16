@@ -22,6 +22,7 @@ in {
       configure = {
         packages.myPlugins = with pkgs.vimPlugins; {
           start = [
+            CopilotChat-nvim
             coc-cmake
             coc-css
             coc-diagnostic
