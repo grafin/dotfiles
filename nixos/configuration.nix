@@ -83,7 +83,12 @@
   virtualisation = {
     podman = {
       enable = true;
-      dockerCompat = true;
+      dockerCompat = false;
+    };
+    docker = {
+      rootless = {
+        enable = true;
+      };
     };
   };
 
