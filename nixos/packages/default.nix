@@ -3,7 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     ansible
-    awscli
+    awscli2
     bottom
     ccls
     codespell
