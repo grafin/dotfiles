@@ -35,9 +35,11 @@
     tree
     udiskie
     universal-ctags
+    unzip
     usbutils
     valgrind
     wget
+    zip
   ];
 
   programs.mtr.enable = true;
