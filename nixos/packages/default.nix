@@ -8,6 +8,7 @@
     ccls
     codespell
     cppcheck
+    devpod
     ffmpeg
     file
     gh
