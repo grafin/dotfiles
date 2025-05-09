@@ -217,8 +217,6 @@ in {
         nmap <F10> <Plug>(coc-rename)
         nmap <F11> <Plug>(coc-codelens-action)
 
-        set pastetoggle=<F12>
-
         " nvim-gdb
         function! NvimGdbNoTKeymaps()
           tnoremap <silent> <buffer> <esc> <c-\><c-n>
