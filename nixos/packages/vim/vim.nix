@@ -91,6 +91,7 @@ in {
             coc-yaml
             copilot-vim
             lightline-vim
+            lsp_lines-nvim
             nerdtree
             nerdtree-git-plugin
             nvim-gdb
