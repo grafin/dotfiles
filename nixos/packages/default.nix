@@ -14,6 +14,7 @@
     gitFull
     gnupg
     goofys
+    google-cloud-sdk
     haskellPackages.update-nix-fetchgit
     inetutils
     jq
