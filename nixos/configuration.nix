@@ -139,4 +139,9 @@
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
    "minecraft-server-1.20.4"
   ];
+
+  services.xserver = {
+    enable = true;
+    windowManager.openbox.enable = true;
+  };
 }
