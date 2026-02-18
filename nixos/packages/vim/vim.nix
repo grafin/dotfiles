@@ -1,6 +1,8 @@
 { config, pkgs, ... }:
 
 let
+  python3Env = pkgs.python3.withPackages (ps: with ps; [ pynvim ]);
+
   omnisharp-vim = pkgs.vimUtils.buildVimPlugin {
     pname = "omnisharp-vim";
     version = "unstable-2022-04-05";
@@ -13,58 +15,6 @@ let
     meta.homepage = "https://github.com/OmniSharp/omnisharp-vim";
   };
 
-  luaConf = pkgs.writeText "init.lua"
-  ''
-    require("CopilotChat").setup({
-      mappings = {
-        complete = {
-          insert = '<Tab>',
-        },
-        close = {
-          normal = 'q',
-          insert = '<C-c>',
-        },
-        reset = {
-          normal = '<C-r>',
-          insert = '<C-r>',
-        },
-        submit_prompt = {
-          normal = '<CR>',
-          insert = '<C-s>',
-        },
-        toggle_sticky = {
-          detail = 'Makes line under cursor sticky or deletes sticky line.',
-          normal = 'gr',
-        },
-        accept_diff = {
-          normal = '<C-y>',
-          insert = '<C-y>',
-        },
-        jump_to_diff = {
-          normal = 'gj',
-        },
-        quickfix_diffs = {
-          normal = 'gq',
-        },
-        yank_diff = {
-          normal = 'gy',
-          register = '"',
-        },
-        show_diff = {
-          normal = 'gd',
-        },
-        show_info = {
-          normal = 'gi',
-        },
-        show_context = {
-          normal = 'gc',
-        },
-        show_help = {
-          normal = 'gh',
-        },
-      },
-    })
-  '';
 in {
   environment.variables = { EDITOR = "vim"; };
 
@@ -72,22 +22,22 @@ in {
     nodejs
     (neovim.override {
       vimAlias = true;
+      withPython3 = true;
+      extraPython3Packages = ps: with ps; [ pynvim ];
       configure = {
         packages.myPlugins = with pkgs.vimPlugins; {
           start = [
             CopilotChat-nvim
             coc-cmake
             coc-css
-            coc-go
             coc-html
             coc-json
+            coc-lua
             coc-nvim
             coc-pyright
             coc-rust-analyzer
             coc-snippets
             coc-spell-checker
-            coc-sumneko-lua
-            coc-tsserver
             coc-yaml
             copilot-vim
             lightline-vim
@@ -101,10 +51,11 @@ in {
             typescript-vim
             vim-easytags
             vim-fugitive
+            vim-go
             vim-lastplace
             vim-nix
             vim-obsession
-            vim-polyglot
+            # vim-polyglot # removed: conflicts with Neovim 0.11 built-in filetype.lua
             vim-prosession
             vim-signify
             vim-snippets
@@ -114,12 +65,61 @@ in {
           ];
           opt = [];
         };
+      customLuaRC = ''
+        vim.g.python3_host_prog = '${python3Env}/bin/python3'
+
+        -- @TODO require("remote-nvim").setup()
+        require("CopilotChat").setup({
+          mappings = {
+            complete = {
+              insert = '<Tab>',
+            },
+            close = {
+              normal = 'q',
+              insert = '<C-c>',
+            },
+            reset = {
+              normal = '<C-r>',
+              insert = '<C-r>',
+            },
+            submit_prompt = {
+              normal = '<CR>',
+              insert = '<C-s>',
+            },
+            toggle_sticky = {
+              detail = 'Makes line under cursor sticky or deletes sticky line.',
+              normal = 'gr',
+            },
+            accept_diff = {
+              normal = '<C-y>',
+              insert = '<C-y>',
+            },
+            jump_to_diff = {
+              normal = 'gj',
+            },
+            quickfix_diffs = {
+              normal = 'gq',
+            },
+            yank_diff = {
+              normal = 'gy',
+              register = '"',
+            },
+            show_diff = {
+              normal = 'gd',
+            },
+            show_info = {
+              normal = 'gi',
+            },
+            show_context = {
+              normal = 'gc',
+            },
+            show_help = {
+              normal = 'gh',
+            },
+          },
+        })
+      '';
       customRC = ''
-        luafile ${luaConf}
-
-        set nocompatible
-        filetype off
-
         set exrc
         set secure
         set encoding=utf-8
@@ -136,7 +136,7 @@ in {
         let g:lightline = {"colorscheme": "PaperColor",}
 
         syntax on
-        set t_Co=256
+        set notermguicolors
         autocmd ColorScheme * highlight ExtraWhitespace ctermbg=red guibg=red
         set background=light
         colorscheme PaperColor
@@ -238,7 +238,6 @@ in {
   hadolint
   mono
   neovim-remote
-  nodePackages.coc-tsserver
   nodePackages.typescript
   omnisharp-roslyn
   rr
