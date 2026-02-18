@@ -2,36 +2,35 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
+# NixOS system configuration
 { config, pkgs, lib, ... }:
 
 {
   imports = [
-      ./hardware-configuration.nix
-      ./network.nix
-      ./www.nix
-      ./remote.nix
-      ./packages/default.nix
-      ./pproxy.nix
-      ./kafka.nix
-      ./secret_vk.nix
-      ./minecraft-server.nix
-    ];
-
-  # Use systemd-boot EFI boot loader.
-  boot.loader = {
-    efi.canTouchEfiVariables = true;
-    systemd-boot = {
-      enable = true;
-      consoleMode = "keep";
-      configurationLimit = 10;
-    };
-  };
-
-  # Linux kernel
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-  boot.kernelParams = [
-    "mitigations=off"
+    ./hardware-configuration.nix
+    ./network.nix
+    ./www.nix
+    ./remote.nix
+    ./packages/default.nix
+    ./pproxy.nix
+    ./kafka.nix
+    ./secret_vk.nix
+    ./minecraft-server.nix
   ];
+
+  # Bootloader and kernel
+  boot = {
+    loader = {
+      efi.canTouchEfiVariables = true;
+      systemd-boot = {
+        enable = true;
+        consoleMode = "keep";
+        configurationLimit = 10;
+      };
+    };
+    kernelPackages = pkgs.linuxPackages_latest;
+    kernelParams = [ "mitigations=off" ];
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
@@ -51,18 +50,20 @@
         KbdInteractiveAuthentication = false;
       };
     };
+    xserver = {
+      enable = true;
+      windowManager.openbox.enable = true;
+    };
   };
 
-  # Internationalisation properties.
+  # Internationalization and console
   i18n.defaultLocale = "en_US.UTF-8";
-
-  # Console
   console = {
     font = "Lat2-Terminus16";
     keyMap = "us";
   };
 
-  # Time zone and location
+  # Time and location
   time.timeZone = "Europe/Moscow";
   location = {
     provider = "manual";
@@ -70,8 +71,7 @@
     longitude = 37.500270;
   };
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
+  # GnuPG agent
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
@@ -79,69 +79,58 @@
     #pinentryPackage = pkgs.pinentry-curses;
   };
 
-  # Podman
+  # Virtualization
   virtualisation = {
     podman = {
       enable = true;
       dockerCompat = false;
     };
-    docker = {
-      rootless = {
-        enable = true;
-      };
+    docker.rootless.enable = true;
+  };
+
+  # User and group management
+  users = {
+    groups.docker = {};
+    users.boris = {
+      isNormalUser = true;
+      home = "/home/boris";
+      description = "Demidov Borislav";
+      extraGroups = [ "docker" "wheel" ];
     };
   };
 
-  # Groups
-  users.groups = {
-    docker = { };
-  };
-
-  # Users
-  users.users.boris = {
-    isNormalUser = true;
-    home = "/home/boris";
-    description = "Demidov Borislav";
-    extraGroups = [
-      "docker"
-      "wheel"
-    ];
-  };
-
+  # Nix settings
   nix.settings.auto-optimise-store = true;
 
-  # Man
+  # Documentation and debug info
   documentation.dev.enable = true;
-
-  # Debug symbols
   environment.enableDebugInfo = true;
 
-  environment.variables = {
-    NIX_SHELL_PRESERVE_PROMPT = "true";
+  # Environment variables
+  environment.variables.NIX_SHELL_PRESERVE_PROMPT = "true";
+
+  # Security
+  security = {
+    pam.loginLimits = [{
+      domain = "*";
+      type = "soft";
+      item = "nofile";
+      value = "unlimited";
+    }];
+    sudo.extraRules = [{
+      users = [ "boris" ];
+      commands = [{
+        command = "ALL";
+        options = [ "NOPASSWD" ];
+      }];
+    }];
   };
 
-  security.pam.loginLimits = [{
-    domain = "*";
-    type = "soft";
-    item = "nofile";
-    value = "unlimited";
-  }];
-
-  security.sudo.extraRules= [{
-    users = [ "boris" ];
-    commands = [{
-      command = "ALL";
-      options= [ "NOPASSWD" ];
-    }];
-  }];
-
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-   "minecraft-server-1.20.4"
-  ];
-
-  services.xserver = {
-    enable = true;
-    windowManager.openbox.enable = true;
+  # Allow unfree packages
+  nixpkgs.config = {
+    allowUnfree = true;
+    allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+      "minecraft-server-1.20.4"
+    ];
   };
 }
