@@ -5,3 +5,6 @@ boris/.config/git/secret/
 boris/.ssh/secret
 boris/.netrc
 boris/.bashrc.secret
+nix-shells/
+CLAUDE.md
+claude/

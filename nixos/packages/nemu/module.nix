@@ -199,6 +199,8 @@ in {
           WorkingDirectory = "/home/${user}";
           EnvironmentFile = "/tmp/nemu-daemon-${user}.env";
           ExecStart = "${config.security.wrapperDir}/nemu --daemon";
+          Restart = "on-failure";
+          RestartSec = 10;
         };
         after = [ "nemu-uid-${user}" ];
         wantedBy = [ "nemu.target" ];
