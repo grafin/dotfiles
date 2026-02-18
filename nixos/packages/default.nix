@@ -11,6 +11,7 @@
     devpod
     ffmpeg
     file
+    firefox
     gh
     gitFull
     gnupg
