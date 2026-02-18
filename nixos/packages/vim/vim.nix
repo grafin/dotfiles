@@ -3,17 +3,6 @@
 let
   python3Env = pkgs.python3.withPackages (ps: with ps; [ pynvim ]);
 
-  omnisharp-vim = pkgs.vimUtils.buildVimPlugin {
-    pname = "omnisharp-vim";
-    version = "unstable-2022-04-05";
-    src = pkgs.fetchFromGitHub {
-      owner = "OmniSharp";
-      repo = "omnisharp-vim";
-      rev = "08d85b86978cb02d5faf3d266bf3fb233e98d463";
-      sha256 = "0kdycajw21igkwzgfnp9kj8ksgw1xhg5l945bk1k0lcbsv5m5awk";
-    };
-    meta.homepage = "https://github.com/OmniSharp/omnisharp-vim";
-  };
 
 #  remote-nvim = pkgs.vimUtils.buildVimPlugin {
 #    pname = "remote-nvim";
@@ -60,13 +49,11 @@ in {
             # nui-nvim # remote-nvim dependencie
             nvim-gdb
             nvim-jqx
-            omnisharp-vim
             papercolor-theme
             # plenary-nvim # remote-nvim dependencie
             # remote-nvim
             # telescope-nvim # remote-nvim dependencie
             typescript-vim
-            vim-easytags
             vim-fugitive
             vim-go
             vim-lastplace
@@ -78,7 +65,6 @@ in {
             vim-snippets
             vim-tmux-focus-events
             vim-tmux-navigator
-            vimproc-vim
           ];
           opt = [];
         };
@@ -138,7 +124,6 @@ in {
       '';
       customRC = ''
         set exrc
-        set secure
         set encoding=utf-8
         set tabstop=4 softtabstop=4 shiftwidth=4 expandtab
         set backspace=indent,eol,start
@@ -163,12 +148,6 @@ in {
         let g:NERDTreeDirArrowExpandable = ""
         let g:NERDTreeDirArrowCollapsible = ""
         let g:NERDTreeIgnore = ["__pycache__"]
-
-        let g:easytags_async = 1
-
-        let g:OmniSharp_server_path = "${omnisharp-roslyn}/src/OmniSharp.exe"
-        let g:OmniSharp_log_dir = $HOME."/.local/share/omnisharp/log"
-        let g:OmniSharp_server_use_mono = 1
 
         autocmd FileType c set tabstop=8 softtabstop=8 shiftwidth=8 noexpandtab
         autocmd FileType cmake set tabstop=2 softtabstop=2 shiftwidth=2 expandtab
@@ -289,11 +268,9 @@ in {
   })
   gopls
   hadolint
-  mono
   neovim-remote
   nodePackages.typescript
   nodePackages.typescript-language-server
-  omnisharp-roslyn
   rr
   rust-analyzer
   lua-language-server
