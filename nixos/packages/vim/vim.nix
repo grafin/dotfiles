@@ -218,7 +218,21 @@ in {
         nmap <F11> <Plug>(coc-codelens-action)
 
         " Use nix store paths to bypass broken system profile symlinks
-        autocmd VimEnter * call coc#config('languageserver.ccls.command', '${ccls}/bin/ccls')
+        autocmd VimEnter * call coc#config('rust-analyzer.server.path', '${rust-analyzer}/bin/rust-analyzer')
+        autocmd VimEnter * call coc#config('languageserver.ccls', {
+              \ 'command': '${ccls}/bin/ccls',
+              \ 'filetypes': ['c', 'cc', 'cpp', 'objc', 'objcpp'],
+              \ 'rootPatterns': ['.ccls', 'compile_commands.json', '.git/', '.hg/'],
+              \ 'initializationOptions': {
+              \   'cache': {'directory': '/tmp/ccls'},
+              \   'client': {'snippetSupport': v:true}
+              \ }
+              \ })
+        autocmd VimEnter * call coc#config('languageserver.golang', {
+              \ 'command': '${gopls}/bin/gopls',
+              \ 'rootPatterns': ['go.mod', '.vim/', '.git/', '.hg/'],
+              \ 'filetypes': ['go']
+              \ })
         autocmd VimEnter * call coc#config('languageserver.lua', {
               \ 'command': '${lua-language-server}/bin/lua-language-server',
               \ 'filetypes': ['lua'],

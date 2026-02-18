@@ -1,32 +1,6 @@
 {
-  "python.jediEnabled": true,
-  "python.jediPath": "/var/run/current-system/sw/lib/python3.12/site-packages",
-
-  "rust-analyzer.server.path": "/var/run/current-system/sw/bin/rust-analyzer",
-
   "diagnostic-languageserver.filetypes": {
     "dockerfile": "hadolint"
-  },
-
-  "languageserver": {
-    "ccls": {
-      "command": "ccls",
-      "filetypes": ["c", "cc", "cpp", "objc", "objcpp"],
-      "rootPatterns": [".ccls", "compile_commands.json", ".git/", ".hg/"],
-      "initializationOptions": {
-        "cache": {
-          "directory": "/tmp/ccls"
-        },
-        "client": {
-          "snippetSupport": true
-        }
-      }
-    },
-    "golang": {
-      "command": "/var/run/current-system/sw/bin/gopls",
-      "rootPatterns": ["go.mod", ".vim/", ".git/", ".hg/"],
-      "filetypes": ["go"]
-    }
   },
 
   "snippets.ultisnips.pythonPrompt": false
