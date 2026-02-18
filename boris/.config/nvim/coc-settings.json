@@ -1,7 +1,0 @@
-{
-  "diagnostic-languageserver.filetypes": {
-    "dockerfile": "hadolint"
-  },
-
-  "snippets.ultisnips.pythonPrompt": false
-}

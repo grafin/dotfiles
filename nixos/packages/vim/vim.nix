@@ -15,6 +15,19 @@ let
     meta.homepage = "https://github.com/OmniSharp/omnisharp-vim";
   };
 
+#  remote-nvim = pkgs.vimUtils.buildVimPlugin {
+#    pname = "remote-nvim";
+#    version = "unstable-2024-12-16";
+#    src = pkgs.fetchFromGitHub {
+#      owner = "amitds1997";
+#      repo = "remote-nvim.nvim";
+#      rev = "ffbf91f6132289a8c43162aba12c7365c28d601c";
+#      sha256 = "00phk7jgg1hrr3vrr5k19kx1a23srwxiqf3nl6gn4v9f7kn900pj";
+#    };
+#    meta.homepage = "https://github.com/amitds1997/remote-nvim.nvim";
+#    dontPatchShebangs = true;
+#  };
+
 in {
   environment.variables = { EDITOR = "vim"; };
 
@@ -44,10 +57,14 @@ in {
             lsp_lines-nvim
             nerdtree
             nerdtree-git-plugin
+            # nui-nvim # remote-nvim dependencie
             nvim-gdb
             nvim-jqx
             omnisharp-vim
             papercolor-theme
+            # plenary-nvim # remote-nvim dependencie
+            # remote-nvim
+            # telescope-nvim # remote-nvim dependencie
             typescript-vim
             vim-easytags
             vim-fugitive
@@ -217,7 +234,9 @@ in {
         nmap <F10> <Plug>(coc-rename)
         nmap <F11> <Plug>(coc-codelens-action)
 
-        " Use nix store paths to bypass broken system profile symlinks
+        " Declarative coc.nvim configuration via nix store paths
+        autocmd VimEnter * call coc#config('diagnostic-languageserver.filetypes', {'dockerfile': 'hadolint'})
+        autocmd VimEnter * call coc#config('snippets.ultisnips.pythonPrompt', v:false)
         autocmd VimEnter * call coc#config('rust-analyzer.server.path', '${rust-analyzer}/bin/rust-analyzer')
         autocmd VimEnter * call coc#config('languageserver.ccls', {
               \ 'command': '${ccls}/bin/ccls',
@@ -232,6 +251,12 @@ in {
               \ 'command': '${gopls}/bin/gopls',
               \ 'rootPatterns': ['go.mod', '.vim/', '.git/', '.hg/'],
               \ 'filetypes': ['go']
+              \ })
+        autocmd VimEnter * call coc#config('languageserver.typescript', {
+              \ 'command': '${nodePackages.typescript-language-server}/bin/typescript-language-server',
+              \ 'args': ['--stdio'],
+              \ 'filetypes': ['typescript', 'typescriptreact', 'javascript', 'javascriptreact'],
+              \ 'rootPatterns': ['tsconfig.json', 'jsconfig.json', 'package.json', '.git/']
               \ })
         autocmd VimEnter * call coc#config('languageserver.lua', {
               \ 'command': '${lua-language-server}/bin/lua-language-server',
@@ -267,6 +292,7 @@ in {
   mono
   neovim-remote
   nodePackages.typescript
+  nodePackages.typescript-language-server
   omnisharp-roslyn
   rr
   rust-analyzer
