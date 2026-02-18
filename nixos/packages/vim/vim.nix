@@ -217,6 +217,9 @@ in {
         nmap <F10> <Plug>(coc-rename)
         nmap <F11> <Plug>(coc-codelens-action)
 
+        " ccls: use nix store path to bypass broken system profile symlink
+        autocmd VimEnter * call coc#config('languageserver.ccls.command', '${ccls}/bin/ccls')
+
         " nvim-gdb
         function! NvimGdbNoTKeymaps()
           tnoremap <silent> <buffer> <esc> <c-\><c-n>
