@@ -32,7 +32,7 @@ in {
             coc-css
             coc-html
             coc-json
-            coc-lua
+            # coc-lua removed: manages own server install, bad for NixOS
             coc-nvim
             coc-pyright
             coc-rust-analyzer
@@ -217,8 +217,19 @@ in {
         nmap <F10> <Plug>(coc-rename)
         nmap <F11> <Plug>(coc-codelens-action)
 
-        " ccls: use nix store path to bypass broken system profile symlink
+        " Use nix store paths to bypass broken system profile symlinks
         autocmd VimEnter * call coc#config('languageserver.ccls.command', '${ccls}/bin/ccls')
+        autocmd VimEnter * call coc#config('languageserver.lua', {
+              \ 'command': '${lua-language-server}/bin/lua-language-server',
+              \ 'filetypes': ['lua'],
+              \ 'rootPatterns': ['.luarc.json', '.git/'],
+              \ 'settings': {
+              \   'Lua': {
+              \     'runtime': {'version': 'LuaJIT'},
+              \     'workspace': {'library': []}
+              \   }
+              \ }
+              \ })
 
         " nvim-gdb
         function! NvimGdbNoTKeymaps()

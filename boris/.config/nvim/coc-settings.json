@@ -4,18 +4,6 @@
 
   "rust-analyzer.server.path": "/var/run/current-system/sw/bin/rust-analyzer",
 
-  "Lua.misc.parameters": [
-    "--metapath",
-    "~/.cache/sumneko_lua/meta",
-    "--logpath",
-    "~/.cache/sumneko_lua/log"
-  ],
-  "Lua.runtime.version": "LuaJIT",
-  "Lua.workspace.library": [
-    "~/dev/github/tarantool/vscode-tarantool"
-  ],
-  "sumneko-lua.serverDir": "/run/current-system/sw/share/lua-language-server",
-
   "diagnostic-languageserver.filetypes": {
     "dockerfile": "hadolint"
   },
@@ -38,6 +26,8 @@
       "command": "/var/run/current-system/sw/bin/gopls",
       "rootPatterns": ["go.mod", ".vim/", ".git/", ".hg/"],
       "filetypes": ["go"]
-    },
-  }
+    }
+  },
+
+  "snippets.ultisnips.pythonPrompt": false
 }
