@@ -6,6 +6,7 @@
     awscli2
     bottom
     ccls
+    claude-code
     codespell
     cppcheck
     devpod
