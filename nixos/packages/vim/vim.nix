@@ -69,7 +69,7 @@ in {
   environment.variables = { EDITOR = "vim"; };
 
   environment.systemPackages = with pkgs; [
-    nodejs_20
+    nodejs
     (neovim.override {
       vimAlias = true;
       configure = {
@@ -191,7 +191,7 @@ in {
         inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm() : "\<C-g>u\<CR>"
 
         " Configure github copilot
-        let g:copilot_node_command = "${nodejs_20}/bin/node"
+        let g:copilot_node_command = "${nodejs}/bin/node"
         " let g:copilot_proxy = "localhost:1337"
 
         " Split navigation
