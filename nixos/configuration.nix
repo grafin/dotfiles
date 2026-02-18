@@ -14,7 +14,7 @@
     ./packages/default.nix
     ./pproxy.nix
     ./kafka.nix
-    ./secret_vk.nix
+    /home/boris/dev/github/dotfiles/nixos/secret_vk.nix
     ./minecraft-server.nix
   ];
 
@@ -100,7 +100,10 @@
   };
 
   # Nix settings
-  nix.settings.auto-optimise-store = true;
+  nix.settings = {
+    auto-optimise-store = true;
+    experimental-features = [ "nix-command" "flakes" ];
+  };
 
   # Documentation and debug info
   documentation.dev.enable = true;
