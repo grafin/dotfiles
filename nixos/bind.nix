@@ -1,9 +1,11 @@
 { ... }:
 
-{
+let
+  bindAddress = "192.168.0.70";
+in {
   services.bind = {
     enable = true;
-    listenOn = [ "192.168.0.70" ];
+    listenOn = [ bindAddress ];
     extraOptions = ''
       recursion no;
     '';

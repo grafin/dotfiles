@@ -1,6 +1,11 @@
 { ... }:
 
-{
+let
+  ens33Address = "172.16.17.10";
+  ens33Gateway = "172.16.17.2";
+  ens34Address = "172.16.18.10";
+  hostAddress = "172.16.18.1";
+in {
   networking = {
     hostName = "nixos";
     useDHCP = false;
@@ -10,18 +15,18 @@
     interfaces = {
       ens33.ipv4 = {
         addresses = [{
-          address = "172.16.17.10";
+          address = ens33Address;
           prefixLength = 24;
         }];
         routes = [{
           address = "0.0.0.0";
           prefixLength = 0;
-          via = "172.16.17.2";
+          via = ens33Gateway;
         }];
       };
       ens34.ipv4 = {
         addresses = [{
-          address = "172.16.18.10";
+          address = ens34Address;
           prefixLength = 24;
         }];
       };
@@ -36,7 +41,7 @@
     ];
 
     hosts = {
-      "172.16.18.1" = [ "host" ];
+      "${hostAddress}" = [ "host" ];
     };
 
     firewall = {
