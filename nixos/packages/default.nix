@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, claude-code, ... }:
 
 {
   environment.systemPackages = with pkgs; [
@@ -6,7 +6,7 @@
     awscli2
     bottom
     ccls
-    claude-code
+    claude-code.packages.x86_64-linux.default
     codespell
     cppcheck
     devpod
