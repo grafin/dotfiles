@@ -14,6 +14,10 @@ case "${1:-}" in
         # Rebuild system using current flake.lock (no input updates)
         rebuild switch --flake "$FLAKE" --impure
         ;;
+    boot)
+        # Install to bootloader but don't activate until next reboot
+        rebuild boot --flake "$FLAKE" --impure
+        ;;
     test)
         # Build and activate without updating bootloader (reverts on reboot)
         rebuild test --flake "$FLAKE" --impure
@@ -39,9 +43,10 @@ case "${1:-}" in
         sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
         ;;
     *)
-        echo "Usage: $0 {switch|test|update|diff|clean|history}"
+        echo "Usage: $0 {switch|boot|test|update|diff|clean|history}"
         echo ""
         echo "  switch  - Rebuild system with current pinned inputs"
+        echo "  boot    - Install to bootloader, activate on next reboot"
         echo "  test    - Build and activate without touching bootloader"
         echo "  update  - Update flake inputs then rebuild"
         echo "  diff    - Show package changes without applying"
