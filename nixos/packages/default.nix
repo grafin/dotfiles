@@ -15,6 +15,7 @@
     firefox
     gh
     gitFull
+    github-copilot-cli
     gnupg
     goofys
     google-cloud-sdk
