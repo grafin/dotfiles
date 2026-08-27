@@ -13,6 +13,7 @@
     ffmpeg
     file
     firefox
+    fuse3
     gh
     gitFull
     github-copilot-cli
