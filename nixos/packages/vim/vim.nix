@@ -30,7 +30,7 @@ in {
         packages.myPlugins = with pkgs.vimPlugins; {
           start = [
             CopilotChat-nvim
-            coc-cmake
+            # coc-cmake remove: deprecated
             coc-css
             coc-html
             coc-json
