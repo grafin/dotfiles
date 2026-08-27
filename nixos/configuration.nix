@@ -71,6 +71,9 @@
     longitude = 37.500270;
   };
 
+  # Allow running non-patched binaries
+  programs.nix-ld.enable = true;
+
   # GnuPG agent
   programs.gnupg.agent = {
     enable = true;
