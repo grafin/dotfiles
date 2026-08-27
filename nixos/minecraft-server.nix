@@ -2,7 +2,7 @@
 
 {
   imports = [
-    ./bind.nix
+#    ./bind.nix
     ./mysql.nix
   ];
 
