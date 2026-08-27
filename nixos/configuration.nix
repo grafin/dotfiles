@@ -12,7 +12,7 @@
     ./www.nix
     ./remote.nix
     ./packages/default.nix
-    ./pproxy.nix
+    # ./pproxy.nix
     ./kafka.nix
     /home/boris/dev/github/dotfiles/nixos/secret_vk.nix
     ./minecraft-server.nix
