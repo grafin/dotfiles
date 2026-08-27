@@ -232,7 +232,7 @@ in {
               \ 'filetypes': ['go']
               \ })
         autocmd VimEnter * call coc#config('languageserver.typescript', {
-              \ 'command': '${nodePackages.typescript-language-server}/bin/typescript-language-server',
+              \ 'command': '${typescript-language-server}/bin/typescript-language-server',
               \ 'args': ['--stdio'],
               \ 'filetypes': ['typescript', 'typescriptreact', 'javascript', 'javascriptreact'],
               \ 'rootPatterns': ['tsconfig.json', 'jsconfig.json', 'package.json', '.git/']
@@ -269,8 +269,8 @@ in {
   gopls
   hadolint
   neovim-remote
-  nodePackages.typescript
-  nodePackages.typescript-language-server
+  typescript
+  typescript-language-server
   rr
   rust-analyzer
   lua-language-server
